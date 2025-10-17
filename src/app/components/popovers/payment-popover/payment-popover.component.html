@@ -1,0 +1,20 @@
+<ion-content>
+
+  <form [formGroup]="paymentForm" (submit)="addPayment()">
+    <ion-input formControlName="amount" label="Monto" label-placement="floating" fill="solid" placeholder="Ingresar monto..." type="number"></ion-input>
+    <ion-select formControlName="type" label="Tipo de pago" fill="solid" labelPlacement="floating" value="">
+      <ion-select-option value="cash">Efectivo</ion-select-option>
+      <ion-select-option value="transfer">Transferencia</ion-select-option>
+    </ion-select>
+    <ion-toolbar>
+      <ion-buttons slot="end">
+        <ion-button color="danger" slot="end">
+          Salir
+        </ion-button>
+        <ion-button color="primary" slot="end" type="submit">
+          Confirmar
+        </ion-button>
+      </ion-buttons>
+    </ion-toolbar>
+  </form>
+</ion-content>

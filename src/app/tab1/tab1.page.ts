@@ -1,7 +1,9 @@
 import { Component, OnInit } from '@angular/core';
 import * as mapboxgl from 'mapbox-gl';
-import { Route } from '../services/route';
-import { Observable } from 'rxjs';
+import { VisitService } from '../services/visit.service';
+import { VisitMarker } from '../interfaces/visit-marker';
+import { ModalController } from '@ionic/angular';
+import { VisitModalComponent } from '../components/modals/visit-modal/visit-modal.component';
 
 @Component({
   selector: 'app-tab1',
@@ -12,87 +14,92 @@ import { Observable } from 'rxjs';
 export class Tab1Page implements OnInit {
 
   map: mapboxgl.Map | null = null;
-  markers: mapboxgl.Marker[] = [
-    new mapboxgl.Marker()
-                .setLngLat([-65.160842, -26.856323])
-                .setPopup(new mapboxgl.Popup()
-                .setHTML("<h1 style='color: gray'>El alfa</h1>")),
-    new mapboxgl.Marker()
-                .setLngLat([-65.15720667975896, -26.85527562778581])
-                .setPopup(new mapboxgl.Popup()
-                .setHTML("<h1 style='color: gray'>Fredo</h1>"))
-    // new mapboxgl.Marker()
-    // new mapboxgl.Marker()
-    //             .setLngLat([-65.16196870081968, -26.840254361283453])
-    //             .setPopup(new mapboxgl.Popup()
-    //             .setHTML("<h1 style='color: gray'>Plaza la Banda</h1>")),
-  ];
+  visits: any[] = [];
+  markers: VisitMarker[] = [];
+  // markers: mapboxgl.Marker[] = [
+  // ];
 
-  constructor(private routeService: Route) {}
+  constructor(private visitService: VisitService,
+              private modalCtrl: ModalController
+  ) {
+  }
 
   async ngOnInit(): Promise<any> {
     this.initializeMap();
 
-    this.initializeMarkers();
+    this.getVisits();
 
-    this.initializeRoute();
+    // this.visitService.getVisits("1").subscribe((resp) => {
+      
+    // });
   }
 
   initializeMap(): void {
     (mapboxgl as any).accessToken = 'pk.eyJ1Ijoid29va2llciIsImEiOiJjbWZpeGp0cjUwY2lwMmtwdnFwYnN6eTIxIn0.eMs3r09QHZyIgZ5f6UfIjQ'; // Cast to any to avoid TypeScript errors
     this.map = new mapboxgl.Map({
       container: 'map', // container ID
-      // style: 'mapbox://styles/mapbox/streets-v11', // style URL
-      center: [-65.160842, -26.856323], // starting position [lng, lat]
-      zoom: 20 // starting zoom
+      style: 'mapbox://styles/mapbox/streets-v11', // style URL
+      // style: 'mapbox://styles/mapbox/streets-v12',
+      center: [-65.2064410002705, -26.829806637711094], // starting position [lng, lat]
+      zoom: 12 // starting zoom
     });
 
-    this.map.on("load", () => {window.dispatchEvent(new Event("resize"));});
-  }
-
-  initializeMarkers(): void {
-    this.markers.forEach((marker) => {
-      if(this.map != null) marker.addTo(this.map);
+    this.map.on("load", () => {
+      window.dispatchEvent(new Event("resize"));
     });
   }
 
-  initializeRoute(): any{
-    let coords: string[] = [];
+  getVisits(): void {
+    this.visitService.getVisits("1").subscribe((resp: any) => {
+      this.visits.push(...resp.result)
+      this.createMarkers();
+    })
+  }
 
-    this.markers.forEach(marker => {
-      coords.push( marker.getLngLat().lng.toString() + ',' + marker.getLngLat().lat.toString() );
-    });
+  async markerClicked(visit: any){
+    console.log(visit);
+    const modal = await this.modalCtrl.create({
+      component: VisitModalComponent,
+      cssClass: 'my-custom-modal',
+      componentProps: {
+        visit
+      }
+    })
 
-    let coordsString = coords.join(';');
+    modal.present()
+  }
 
-    this.routeService.getRoute(coordsString).subscribe({next: (resp: any) => {
-      let geometry = resp.routes[0].geometry;
-      const geojson: any = {
-        'type': 'Feature',
-        'properties': {},
-        'geometry': geometry
-      };
-      console.log(geojson);
+  createMarkers(): void {
+      const markers: VisitMarker[] = this.visits.map((visit: any) => {
+        const location_long = visit.sale.client.location_longlat.split(',')[0];
+        const location_lat = visit.sale.client.location_longlat.split(',')[1]
 
-      this.map?.addLayer({
-        id: 'route',
-        type: 'line',
-        source: {
-          type: 'geojson',
-          data: geojson
-        },
-        layout: {
-          'line-join': 'round',
-          'line-cap': 'round'
-        },
-        paint: {
-          'line-color': '#ff0000',
-          'line-width': 5,
-          'line-opacity': 0.75
+        return {
+          visit: visit,
+          marker: new mapboxgl.Marker(
+                          { color: visit.visit_result != null ? "#259b24" : "#e51c23", scale: 1.3 }
+                        ).setLngLat([location_long, location_lat])
         }
+        // return new mapboxgl.Marker()
+        //                   .setLngLat([location_long, location_lat])
       });
 
-    }});
+      this.markers.push(...markers);
+
+      this.markers.forEach((visitMarker: VisitMarker) => {
+        visitMarker.marker.getElement().addEventListener("click", (event) => {
+          this.markerClicked(visitMarker.visit);
+        });
+      })
+
+      this.addMarkersToMap();
   }
 
+  addMarkersToMap(): void {
+    this.markers.forEach((visitMarker: VisitMarker) => {
+      if(this.map) {
+        visitMarker.marker.addTo(this.map);
+      }
+    })
+  }
 }

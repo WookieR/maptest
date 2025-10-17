@@ -1,0 +1,48 @@
+<div>
+  <ion-header>
+    <ion-toolbar>
+      <ion-title>
+        Sin pagos
+      </ion-title>
+    </ion-toolbar>
+  </ion-header>
+  <ion-content>
+    <ion-list>
+      <ion-card>
+        <ion-card-content>
+          <ion-label>No se registraron pagos durante esta visita, por favor especifique el motivo.</ion-label>
+        </ion-card-content>
+      </ion-card>
+      <ion-card>
+        <ion-card-content>
+          <ion-checkbox [(ngModel)]="enabledFreeText">Texto Libre</ion-checkbox>
+        </ion-card-content>
+      </ion-card>
+      @if(!enabledFreeText){
+        @for(check of checks; track check){
+          <ion-item>
+            <ion-checkbox [(ngModel)]="check.checked" (ngModelChange)="unmarkChecks(check)">{{ check.reason }}</ion-checkbox>
+          </ion-item>
+        }
+      } @else {
+        <ion-item>
+          <ion-input type="text" fill="solid" label="Comentario" labelPlacement="floating" placeholder="Detalle motivo" [(ngModel)]="freeTextCommentary"></ion-input>
+        </ion-item>
+      }
+      
+  
+    </ion-list>
+    
+    
+    <ion-toolbar>
+      <ion-buttons slot="end">
+        <ion-button color="danger" slot="end" (click)="close()">
+          Salir
+        </ion-button>
+        <ion-button color="primary" slot="end" type="submit" (click)="addCommentary()">
+          Confirmar
+        </ion-button>
+      </ion-buttons>
+    </ion-toolbar>
+  </ion-content>
+</div>

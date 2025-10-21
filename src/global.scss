@@ -35,3 +35,29 @@
 /* @import "@ionic/angular/css/palettes/dark.always.css"; */
 /* @import "@ionic/angular/css/palettes/dark.class.css"; */
 @import "@ionic/angular/css/palettes/dark.system.css";
+
+// @keyframes pulse {
+//     0% {
+//         // transform: scale(0.9); /* Slightly smaller at the start */
+//         box-shadow: 0 0 0 0 rgba(0, 204, 255, 0.668); /* Initial shadow */
+//     }
+//     // 70% {
+//     //     // transform: scale(1.1); /* Larger during the pulse */
+//     //     box-shadow: 0 0 0 20px rgba(0, 204, 255, 0); /* Expanding, fading shadow */
+//     // }
+// }
+
+@keyframes pulse {
+  0% {
+    -moz-box-shadow: 0 0 0 0 rgba(97, 178, 228, 0.8);
+    box-shadow: 0 0 0 0 rgba(97, 178, 228, 0.8);
+  }
+  70% {
+      -moz-box-shadow: 0 0 0 10px rgba(97, 178, 228, 0);
+      box-shadow: 0 0 0 10px rgba(97, 178, 228, 0);
+  }
+  100% {
+      -moz-box-shadow: 0 0 0 0 rgba(97, 178, 228, 0);
+      box-shadow: 0 0 0 0 rgba(97, 178, 228, 0);
+  }
+}

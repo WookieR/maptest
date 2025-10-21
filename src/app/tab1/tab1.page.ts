@@ -1,9 +1,20 @@
 import { Component, OnInit } from '@angular/core';
+
+import { Position } from '@capacitor/geolocation';
 import * as mapboxgl from 'mapbox-gl';
+
 import { VisitService } from '../services/visit.service';
 import { VisitMarker } from '../interfaces/visit-marker';
 import { ModalController } from '@ionic/angular';
 import { VisitModalComponent } from '../components/modals/visit-modal/visit-modal.component';
+import { PermissionService } from '../stores/permission.service';
+import { GeolocationService } from '../stores/geolocation.service';
+import { RouteService } from '../services/route.service';
+import { ClientsModalComponent } from '../components/modals/clients-modal/clients-modal.component';
+import { haversineDistanceKM } from '../helpers/distance';
+import { MapFollowService } from '../stores/map-follow.service';
+import { calcBoundsFromCoordinates } from '../helpers/bound-coordinates';
+
 
 @Component({
   selector: 'app-tab1',
@@ -13,36 +24,60 @@ import { VisitModalComponent } from '../components/modals/visit-modal/visit-moda
 })
 export class Tab1Page implements OnInit {
 
+  positionWatch: any;
   map: mapboxgl.Map | null = null;
   visits: any[] = [];
   markers: VisitMarker[] = [];
+  currentPositionMarker: mapboxgl.Marker | null = null;
   // markers: mapboxgl.Marker[] = [
   // ];
 
-  constructor(private visitService: VisitService,
+  constructor(private permissionService: PermissionService,
+              private geolocationService: GeolocationService,
+              private mapFollowService: MapFollowService,
+              private routeService: RouteService,
+              private visitService: VisitService,
               private modalCtrl: ModalController
   ) {
   }
 
   async ngOnInit(): Promise<any> {
+    
     this.initializeMap();
 
-    this.getVisits();
+    const platform = await this.permissionService.getPlatform();
 
-    // this.visitService.getVisits("1").subscribe((resp) => {
-      
-    // });
+    let permissionsGranted = await this.permissionService.getGeolocationPermissionStatus(platform);
+
+    if(permissionsGranted) {
+      await this.geolocationService.initGeolocationWatch(this.updateCoords, this.map);
+    }
+
+    this.getVisits();
   }
 
-  initializeMap(): void {
+  updateCoords(position: Position) {
+    const selfMarker = new mapboxgl.Marker({
+      element: document.createElement('div'),
+      className: 'self-position-marker'
+    }).setLngLat([position.coords.longitude, position.coords.latitude])
+  }
+
+  async initializeMap() {
     (mapboxgl as any).accessToken = 'pk.eyJ1Ijoid29va2llciIsImEiOiJjbWZpeGp0cjUwY2lwMmtwdnFwYnN6eTIxIn0.eMs3r09QHZyIgZ5f6UfIjQ'; // Cast to any to avoid TypeScript errors
     this.map = new mapboxgl.Map({
       container: 'map', // container ID
-      style: 'mapbox://styles/mapbox/streets-v11', // style URL
+      // style: 'mapbox://styles/mapbox/streets-v11', // style URL
       // style: 'mapbox://styles/mapbox/streets-v12',
+      style: 'mapbox://styles/wookier/cmh0o168j000h01qk0j3713e8',
       center: [-65.2064410002705, -26.829806637711094], // starting position [lng, lat]
-      zoom: 12 // starting zoom
+      zoom: 15 // starting zoom,
     });
+
+    this.map.addControl(new mapboxgl.NavigationControl({
+      showCompass: true,
+      showZoom: true
+    }));
 
     this.map.on("load", () => {
       window.dispatchEvent(new Event("resize"));
@@ -51,10 +86,33 @@ export class Tab1Page implements OnInit {
 
   getVisits(): void {
     this.visitService.getVisits("1").subscribe((resp: any) => {
-      this.visits.push(...resp.result)
+      this.visits.push(...resp.result);
       this.createMarkers();
+      this.rearrangevisits();
     })
   }
+
+  rearrangevisits() {
+    setInterval(() => {
+      console.log('rearrange');
+      this.visits.map((visit) => {
+        const distance = haversineDistanceKM(this.geolocationService.currentCoords?.coords.longitude + 
+                                              ',' +
+                                              this.geolocationService.currentCoords?.coords.latitude,
+                                              visit.sale.client.location_longlat);
+  
+        visit.distance = distance;
+  
+        return visit;
+      });
+  
+      this.visits.sort(function(a, b) {
+        return parseFloat(a.distance) - parseFloat(b.distance);
+      });
+    }, 10000);
+  }
+
+  
 
   async markerClicked(visit: any){
     console.log(visit);
@@ -77,7 +135,7 @@ export class Tab1Page implements OnInit {
         return {
           visit: visit,
           marker: new mapboxgl.Marker(
-                          { color: visit.visit_result != null ? "#259b24" : "#e51c23", scale: 1.3 }
+                          { color: visit.visit_result != null ? "#259b24" : "#e51c23", scale: 1.2 }
                         ).setLngLat([location_long, location_lat])
         }
         // return new mapboxgl.Marker()
@@ -95,11 +153,44 @@ export class Tab1Page implements OnInit {
       this.addMarkersToMap();
   }
 
+  setObjectiveClient(client: any){
+    this.routeService.setObjective(client.location_longlat);
+    const currentCoords = this.geolocationService.currentCoords?.coords.longitude +
+                          ',' +
+                          this.geolocationService.currentCoords?.coords.latitude;
+    this.routeService.recalculateRoute(currentCoords, this.map, true);
+  }
+
   addMarkersToMap(): void {
     this.markers.forEach((visitMarker: VisitMarker) => {
       if(this.map) {
         visitMarker.marker.addTo(this.map);
       }
     })
+  }
+
+  async openClientsSheetModal() {
+    const clientsModal = await this.modalCtrl.create({
+      component: ClientsModalComponent,
+      breakpoints: [0, 0.25, 0.5, 0.75],
+      initialBreakpoint: 0.25,
+      componentProps: {
+        visits: this.visits
+      }
+    });
+    clientsModal.present()
+
+    const { data: client } = await clientsModal.onDidDismiss();
+
+    if(client) this.setObjectiveClient(client);
+    this.changeMapFollowingMode('route');
+  }
+
+  changeMapFollowingMode(mode: 'route' | 'free') {
+    this.mapFollowService.setMode(mode, this.map);
+  }
+
+  centerInSelf() {
+    this.mapFollowService.centerInSelf(this.map);
   }
 }

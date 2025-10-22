@@ -3,6 +3,8 @@ import { IonicModule, ModalController, PopoverController, ToastController } from
 import { VisitService } from 'src/app/services/visit.service';
 import { PaymentPopoverComponent } from '../../popovers/payment-popover/payment-popover.component';
 import { CommentaryPopoverComponent } from '../../popovers/commentary-popover/commentary-popover.component';
+import * as moment from 'moment';
+import { determineColor } from 'src/app/helpers/marker-color';
 
 @Component({
   selector: 'app-visit-modal',
@@ -19,6 +21,8 @@ export class VisitModalComponent  implements OnInit {
 
   detail: any;
 
+  status: string;
+
   constructor(private modalCtrl: ModalController,
               private popoverCtrl: PopoverController,
               private visitService: VisitService,
@@ -34,14 +38,41 @@ export class VisitModalComponent  implements OnInit {
       this.isLoading = false;
 
       this.detail = resp.result;
+
+      this.status = this.determineStatus(resp.result.visit_result);
     });
+  }
+
+  determineStatus(visitResult: any) {
+    if(!visitResult) return 'Pendiente';
+
+    const targetAmount = parseFloat(this.visit.target_amount);
+
+    const totalPaid = visitResult.payments.reduce((accumulator: any, currentValue: any) => {
+      return accumulator + parseFloat(currentValue.amount);
+    }, 0.0);
+
+    if(totalPaid == 0){
+      return 'Impaga';
+    }
+
+    if(totalPaid < targetAmount){
+      return 'Pago Parcial'
+    }
+
+    if(totalPaid >= targetAmount){
+      return 'Pago Completo'
+    }
+
+    return 'Pendiente'
   }
 
   async openPaymentPopover(e: Event, quotaId: number) {
 
     const paymentPopover = await this.popoverCtrl.create({
       component: PaymentPopoverComponent,
-      event: e
+      // event: e,
+      backdropDismiss: false
     });
     paymentPopover.present();
 
@@ -81,7 +112,13 @@ export class VisitModalComponent  implements OnInit {
       
       if(role == 'close' || role == 'backdrop') return;
 
-      this.visitService.finishVisit([], this.visit.id, comment).subscribe(async (resp) => {
+      this.visitService.finishVisit([], this.visit.id, comment).subscribe(async (resp: any) => {
+        const visitResult = {
+         ...resp.result,
+         created_date: moment().format('DD/MM/YYYY hh:mm'),
+         color: determineColor([], this.detail.target_amount)
+        };
+
         const toastCtrl = await this.toastCtrl.create({
           message: 'La visita fue completada exitosamente!',
           position: 'bottom',
@@ -89,10 +126,20 @@ export class VisitModalComponent  implements OnInit {
           color: 'success',
         });
         toastCtrl.present();
-        this.modalCtrl.dismiss(null, 'dismiss')
+        this.modalCtrl.dismiss(visitResult, 'dismiss')
       });
     } else {
-      this.visitService.finishVisit(this.newPayments, this.visit.id).subscribe(async (resp) => {
+      const payments = this.newPayments.length > 0 ? this.newPayments.flatMap((quotaPayment: any) => quotaPayment.payments) :
+                                                      null;
+
+      const color = determineColor(payments, this.detail.target_amount);
+      this.visitService.finishVisit(this.newPayments, this.visit.id).subscribe(async (resp: any) => {
+        const visitResult = {
+         ...resp.result,
+         created_date: moment().format('DD/MM/YYYY hh:mm'),
+         color: color
+        };
+
         const toastCtrl = await this.toastCtrl.create({
           message: 'La visita fue completada exitosamente!',
           position: 'bottom',
@@ -100,9 +147,20 @@ export class VisitModalComponent  implements OnInit {
           color: 'success'
         });
         toastCtrl.present()
-        this.modalCtrl.dismiss(null, 'dismiss')
+        this.modalCtrl.dismiss(visitResult, 'dismiss')
       });
     }
+  }
+
+  foundInVisitPayments(payment: any){
+    if(this.detail.visit_result == null) return false;
+    const foundPaymentInVisit = this.detail.visit_result.payments.find((visitPayment: any) => {
+      return payment.id == visitPayment.id;
+    })
+
+    if(!foundPaymentInVisit) return false;
+
+    return true;
   }
 
   back() {

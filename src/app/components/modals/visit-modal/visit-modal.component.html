@@ -7,12 +7,14 @@
         </ion-button>
       </ion-buttons>
       <ion-title>Detalles de Cliente</ion-title>
-      <ion-buttons slot="end">
-        <ion-button (click)="finishVisit()" color="primary">
-          Finalizar
-          <ion-icon name="checkmark-outline"></ion-icon>
-        </ion-button>
-      </ion-buttons>
+      @if(visit.visit_result == null) {
+        <ion-buttons slot="end">
+          <ion-button (click)="finishVisit()" color="primary">
+            Finalizar
+            <ion-icon name="checkmark-outline"></ion-icon>
+          </ion-button>
+        </ion-buttons>
+      }
     </ion-toolbar>
   </ion-header>
   <ion-card color="light">
@@ -27,6 +29,37 @@
       </ion-text>
     </ion-card-content>
   </ion-card>
+  @if(!isLoading && detail.visit_result != null) {
+    <ion-card color="light">
+      <ion-card-content class="ion-text-center">
+        <h2>Visita Completada - 
+          <span [class.complete-pay-text]="status == 'Pago Completo'"
+                [class.partial-pay-text]="status == 'Pago Parcial'"
+                [class.impaid-text]="status=='Impaga'">
+            {{status}}
+          </span>
+        </h2>
+        <ion-text color="medium">
+          <div style="display: flex;" class="ion-justify-content-center">
+            <p>{{ visit.completed_at_date }}</p>
+          </div>
+        </ion-text>
+      </ion-card-content>
+    </ion-card>
+
+    @if(!isLoading && detail.visit_result.commentary != null) {
+      <ion-card color="light">
+        <ion-card-content class="ion-text-center">
+          <h2>Comentario</h2>
+          <ion-text color="medium">
+            <div style="display: flex;" class="ion-justify-content-center">
+              <p>{{ visit.visit_result.commentary }}</p>
+            </div>
+          </ion-text>
+        </ion-card-content>
+      </ion-card>
+    }
+  }
   @if(!isLoading){
     <ion-segment value="quotas">
         <ion-segment-button value="quotas" content-id="quotas">
@@ -48,27 +81,23 @@
                   </ion-item>
                   <div class="ion-padding" slot="content">
                     <ion-list>
-
-                    
                       @for(quotaPayment of quota.quota_payments; track quotaPayment){
-                        <ion-item>
-                          <ion-card>
-                            <ion-card-subtitle>
-                              {{quotaPayment.type}}
-                            </ion-card-subtitle>
-                            <ion-card-content>
-                              {{quotaPayment.amount}}
-                            </ion-card-content>
-                          </ion-card>
+                        <ion-item [class.paid-in-visit-item]="foundInVisitPayments(quotaPayment)">
+                          @if(quotaPayment.created_date){
+                            <ion-label>Registrado el: <span style="font-weight: 600;">{{quotaPayment.created_date}}</span></ion-label>
+                          }
+                          
+                          <ion-label>Monto: <span style="font-weight: 600;">{{quotaPayment.amount}}</span></ion-label>
                         </ion-item>
                       }
-
                     </ion-list>
 
-                    <ion-button size="small" expand="block" fill="clear" (click)="openPaymentPopover($event, quota.id)">
-                      Registrar Pago
-                      <ion-icon slot="end" name="add-outline"></ion-icon>
-                    </ion-button>
+                    @if(detail.visit_result == null){
+                      <ion-button size="small" expand="block" fill="clear" (click)="openPaymentPopover($event, quota.id)">
+                        Registrar Pago
+                        <ion-icon slot="end" name="add-outline"></ion-icon>
+                      </ion-button>
+                    }
 
                   </div>
                 </ion-accordion>

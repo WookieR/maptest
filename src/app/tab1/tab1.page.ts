@@ -14,6 +14,7 @@ import { ClientsModalComponent } from '../components/modals/clients-modal/client
 import { haversineDistanceKM } from '../helpers/distance';
 import { MapFollowService } from '../stores/map-follow.service';
 import { calcBoundsFromCoordinates } from '../helpers/bound-coordinates';
+import { determineColor } from '../helpers/marker-color';
 
 
 @Component({
@@ -29,6 +30,7 @@ export class Tab1Page implements OnInit {
   visits: any[] = [];
   markers: VisitMarker[] = [];
   currentPositionMarker: mapboxgl.Marker | null = null;
+  arrangeInterval: any;
   // markers: mapboxgl.Marker[] = [
   // ];
 
@@ -51,9 +53,9 @@ export class Tab1Page implements OnInit {
 
     if(permissionsGranted) {
       await this.geolocationService.initGeolocationWatch(this.updateCoords, this.map);
+      this.getVisits();
     }
 
-    this.getVisits();
   }
 
   updateCoords(position: Position) {
@@ -82,6 +84,14 @@ export class Tab1Page implements OnInit {
     this.map.on("load", () => {
       window.dispatchEvent(new Event("resize"));
     });
+
+    this.map.on("dragstart", () => {
+      this.mapFollowService.addFreeMoveTime();
+    });
+
+    this.map.on("dragend", () => {
+      this.mapFollowService.addFreeMoveTime();
+    });
   }
 
   getVisits(): void {
@@ -89,33 +99,52 @@ export class Tab1Page implements OnInit {
       this.visits.push(...resp.result);
       this.createMarkers();
       this.rearrangevisits();
+      this.startRearrangeInterval();
     })
   }
 
+  startRearrangeInterval(){
+    this.arrangeInterval = setInterval(() => {
+      this.rearrangevisits();
+    }, 10000)
+  };
+
   rearrangevisits() {
-    setInterval(() => {
-      console.log('rearrange');
-      this.visits.map((visit) => {
-        const distance = haversineDistanceKM(this.geolocationService.currentCoords?.coords.longitude + 
-                                              ',' +
-                                              this.geolocationService.currentCoords?.coords.latitude,
-                                              visit.sale.client.location_longlat);
-  
-        visit.distance = distance;
-  
-        return visit;
-      });
-  
-      this.visits.sort(function(a, b) {
-        return parseFloat(a.distance) - parseFloat(b.distance);
-      });
-    }, 10000);
+
+    this.visits.map((visit) => {
+      const distance = haversineDistanceKM(this.geolocationService.currentCoords?.coords.longitude + 
+                                            ',' +
+                                            this.geolocationService.currentCoords?.coords.latitude,
+                                            visit.sale.client.location_longlat);
+
+      visit.distance = distance;
+
+      return visit;
+    });
+
+    const visited = this.visits.filter((visit: any) => {
+      return visit.visit_result != null;
+    });
+
+    const nonVisited = this.visits.filter((visit: any) => {
+      return visit.visit_result == null;
+    })
+
+    // this.sortByDistanceAsc(visited);
+    this.sortByDistanceAsc(nonVisited);
+
+    this.visits.length = 0;
+    this.visits.push(...nonVisited, ...visited);
   }
 
-  
+  sortByDistanceAsc(array: any) {
+    array.sort(function(a: any, b: any) {
+      return parseFloat(a.distance) - parseFloat(b.distance);
+    })
+  }
 
-  async markerClicked(visit: any){
-    console.log(visit);
+  async markerClicked(visit: any, marker: mapboxgl.Marker){
+
     const modal = await this.modalCtrl.create({
       component: VisitModalComponent,
       cssClass: 'my-custom-modal',
@@ -125,6 +154,34 @@ export class Tab1Page implements OnInit {
     })
 
     modal.present()
+
+    const { data: visitResult } = await modal.onDidDismiss();
+
+    if(visitResult == null) return;
+
+    visit.visit_result = visitResult;
+    const visitLongLat = visit.sale.client.location_longlat.split(',');
+
+    marker.remove();
+    marker = new mapboxgl.Marker({ color: visitResult.color, scale: 1.2 })
+                                .setLngLat([visitLongLat[0], visitLongLat[1]]);
+
+    marker.getElement().addEventListener("click", (event) => {
+      this.markerClicked(visit, marker);
+    });
+                          
+    if(this.map) marker.addTo(this.map);
+    window.dispatchEvent(new Event("resize"));
+
+    this.centerInSelf();
+    this.routeService.objectiveCoords = '';
+
+    if (this.map?.getLayer('route') != undefined){
+      this.map?.removeLayer('route');
+      this.map?.removeSource('route');
+    }
+    this.rearrangevisits();
+    this.openClientsSheetModal();
   }
 
   createMarkers(): void {
@@ -132,21 +189,22 @@ export class Tab1Page implements OnInit {
         const location_long = visit.sale.client.location_longlat.split(',')[0];
         const location_lat = visit.sale.client.location_longlat.split(',')[1]
 
+        const payments = visit.visit_result == null ? null : visit.visit_result.payments;
+        const targetAmount = visit.target_amount
+
         return {
           visit: visit,
           marker: new mapboxgl.Marker(
-                          { color: visit.visit_result != null ? "#259b24" : "#e51c23", scale: 1.2 }
+                          { color: determineColor(payments, targetAmount), scale: 1.2 }
                         ).setLngLat([location_long, location_lat])
         }
-        // return new mapboxgl.Marker()
-        //                   .setLngLat([location_long, location_lat])
       });
 
       this.markers.push(...markers);
 
       this.markers.forEach((visitMarker: VisitMarker) => {
         visitMarker.marker.getElement().addEventListener("click", (event) => {
-          this.markerClicked(visitMarker.visit);
+          this.markerClicked(visitMarker.visit, visitMarker.marker);
         });
       })
 
@@ -180,10 +238,34 @@ export class Tab1Page implements OnInit {
     });
     clientsModal.present()
 
-    const { data: client } = await clientsModal.onDidDismiss();
+    const { data } = await clientsModal.onDidDismiss();
 
-    if(client) this.setObjectiveClient(client);
-    this.changeMapFollowingMode('route');
+    if(data == null) return;
+
+    const { client, visited } = data
+
+    if(client == null) return;
+
+    if(!visited) {
+      if(client) this.setObjectiveClient(client);
+      this.mapFollowService.setMode('route', this.map);
+      // this.changeMapFollowingMode('route');
+    } else {
+      this.mapFollowService.setMode('free', this.map);
+      this.routeService.objectiveCoords = '';
+
+      if (this.map?.getLayer('route') != undefined){
+        this.map?.removeLayer('route');
+        this.map?.removeSource('route');
+      }
+
+      this.map?.flyTo({
+          center: [ client.location_longlat.split(',')[0], client.location_longlat.split(',')[1] ],
+          speed: 0.8,
+          curve: 1
+      })
+    }
+
   }
 
   changeMapFollowingMode(mode: 'route' | 'free') {

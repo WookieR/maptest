@@ -24,12 +24,11 @@ export class RouteService {
   }
 
   async recalculateRoute(currentCoords: string, map: any, setNow = false) {
+    if(this.objectiveCoords == '') return;
+
     if(!setNow && this.recalculateCounter < 5) {
-      console.log('subir counter')
       return this.recalculateCounter ++;
     }
-
-    console.log('recalcular')
 
     let routeCoords = '';
     routeCoords += currentCoords + ';' + this.objectiveCoords;

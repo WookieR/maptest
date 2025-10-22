@@ -2,7 +2,7 @@
   <!-- <ion-searchbar placeholder="Search" (click)="modal.setCurrentBreakpoint(0.75)"></ion-searchbar> -->
   <ion-list>
     @for(visit of visits; track visit) {
-      <ion-item (click)="pickObjectiveClient(visit.sale.client)">
+      <ion-item (click)="pickObjectiveClient(visit.sale.client, visit)">
         <ion-avatar slot="start">
           <ion-img src="https://i.pravatar.cc/300?u=b"></ion-img>
         </ion-avatar>
@@ -11,10 +11,17 @@
           <p>{{ visit.sale.client.business_address }}</p>
         </ion-label>
         <ion-label>
-          <ion-button fill="clear" expand="block" shape="round">
-            {{ 'A ' + visit.distance + ' Km' }}
-            <ion-icon style="font-size: xx-large; margin-left: 5px;" name="navigate-circle-outline"></ion-icon>
-          </ion-button>
+          @if(visit.visit_result == null) {
+            <ion-button fill="clear" expand="block" shape="round">
+              {{ 'A ' + visit.distance + ' Km' }}
+              <ion-icon style="font-size: xx-large; margin-left: 5px;" name="navigate-circle-outline"></ion-icon>
+            </ion-button>
+          } @else {
+            <ion-button class="visited-button" fill="clear" expand="block" shape="round" disabled="true">
+              {{ 'Visitado' }}
+              <ion-icon style="margin-left: 5px;" name="checkmark-circle-outline"></ion-icon>
+            </ion-button>
+          }
           <!-- <ion-icon name="navigate-circle-outline"></ion-icon>
           <p>{{ 'A ' + visit.distance + ' Km' }}</p> -->
         </ion-label>

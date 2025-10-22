@@ -6,7 +6,7 @@ import { take } from 'rxjs';
   providedIn: 'root'
 })
 export class VisitService {
-  private baseUrl = 'https://44bb125f8acd.ngrok-free.app/visits';
+  private baseUrl = 'https://751674aba57c.ngrok-free.app/visits';
 
   constructor(private http: HttpClient){ }
   

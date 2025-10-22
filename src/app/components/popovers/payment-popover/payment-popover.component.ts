@@ -25,4 +25,8 @@ export class PaymentPopoverComponent  implements OnInit {
     this.popoverCtrl.dismiss(this.paymentForm.value, 'create');
   }
 
+  close() {
+    this.popoverCtrl.dismiss(null, 'close')
+  }
+
 }

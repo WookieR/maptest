@@ -16,8 +16,11 @@ export class ClientsModalComponent  implements OnInit {
     console.log(this.visits)
   }
 
-  pickObjectiveClient(client: any) {
-    this.modalCtrl.dismiss(client, 'pick');
+  pickObjectiveClient(client: any, visit: any) {
+
+    const visited = visit.visit_result != null ? true : false;
+    
+    this.modalCtrl.dismiss({client, visited}, 'pick');
   }
 
 }

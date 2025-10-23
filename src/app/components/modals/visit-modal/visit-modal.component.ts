@@ -32,7 +32,7 @@ export class VisitModalComponent  implements OnInit {
   }
 
   ngOnInit() {
-    this.isLoading = true
+    this.isLoading = true;
 
     this.visitService.getVisit(this.visit.id).subscribe((resp: any) => {
       this.isLoading = false;
@@ -116,7 +116,8 @@ export class VisitModalComponent  implements OnInit {
         const visitResult = {
          ...resp.result,
          created_date: moment().format('DD/MM/YYYY hh:mm'),
-         color: determineColor([], this.detail.target_amount)
+         color: determineColor([], this.detail.target_amount),
+         payments: []
         };
 
         const toastCtrl = await this.toastCtrl.create({
@@ -137,7 +138,8 @@ export class VisitModalComponent  implements OnInit {
         const visitResult = {
          ...resp.result,
          created_date: moment().format('DD/MM/YYYY hh:mm'),
-         color: color
+         color: color,
+         payments: payments
         };
 
         const toastCtrl = await this.toastCtrl.create({

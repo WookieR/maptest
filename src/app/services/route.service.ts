@@ -2,6 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Position } from '@capacitor/geolocation';
 import { firstValueFrom, take } from 'rxjs';
+import { LocalstorageService } from '../stores/localstorage.service';
 
 @Injectable({
   providedIn: 'root'
@@ -17,10 +18,13 @@ export class RouteService {
 
   objectiveCoords: string;
 
-  constructor(private http: HttpClient){ }
+  constructor(private http: HttpClient,
+              private localstorageService: LocalstorageService){
+  }
 
   setObjective(coords: string) {
     this.objectiveCoords = coords;
+    this.localstorageService.setObjective(coords)
   }
 
   async recalculateRoute(currentCoords: string, map: any, setNow = false) {

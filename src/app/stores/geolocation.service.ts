@@ -3,6 +3,8 @@ import { Geolocation, Position } from '@capacitor/geolocation';
 import * as mapboxgl from 'mapbox-gl';
 import { RouteService } from '../services/route.service';
 import { getSelfMarker } from '../helpers/self-marker';
+import { MapFollowService } from './map-follow.service';
+import { LocalstorageService } from './localstorage.service';
 
 @Injectable({
   providedIn: 'root'
@@ -13,10 +15,13 @@ export class GeolocationService {
   selfMarker: mapboxgl.Marker;
   recalculateCounter: number = 0;
 
-  constructor (private routeService: RouteService) {}
+  constructor (private routeService: RouteService,
+              private localStorage: LocalstorageService) {}
 
-  async setCurrentCoords(position: Position) {
+  async getCurrentPosition() {
+    const position = await Geolocation.getCurrentPosition({enableHighAccuracy: true});
 
+    return position;
   }
 
   async initGeolocationWatch(updateCoordsFunc: Function, map: any) {
@@ -41,6 +46,7 @@ export class GeolocationService {
           speed: 0.8,
           curve: 1
         })
+
       } else {
         if (position) this.selfMarker.setLngLat([position?.coords.longitude, position?.coords.latitude]);
 

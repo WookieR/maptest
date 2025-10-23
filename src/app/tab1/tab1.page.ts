@@ -15,6 +15,7 @@ import { haversineDistanceKM } from '../helpers/distance';
 import { MapFollowService } from '../stores/map-follow.service';
 import { calcBoundsFromCoordinates } from '../helpers/bound-coordinates';
 import { determineColor } from '../helpers/marker-color';
+import { LocalstorageService } from '../stores/localstorage.service'
 
 
 @Component({
@@ -38,12 +39,13 @@ export class Tab1Page implements OnInit {
               private geolocationService: GeolocationService,
               private mapFollowService: MapFollowService,
               private routeService: RouteService,
-              private visitService: VisitService,
+              private localStorage: LocalstorageService,
+              // private visitService: VisitService,
               private modalCtrl: ModalController
   ) {
   }
 
-  async ngOnInit(): Promise<any> {
+  async ngOnInit() {
     
     this.initializeMap();
 
@@ -52,10 +54,24 @@ export class Tab1Page implements OnInit {
     let permissionsGranted = await this.permissionService.getGeolocationPermissionStatus(platform);
 
     if(permissionsGranted) {
+      
+      const objective = await this.localStorage.getObjective();
+
+      if(objective != null) {
+        const currentPosition = await this.geolocationService.getCurrentPosition();
+
+        this.routeService.setObjective(objective);
+        const currentCoords = currentPosition.coords.longitude +
+                            ',' +
+                            currentPosition.coords.latitude;
+        this.routeService.recalculateRoute(currentCoords, this.map, true);
+        this.mapFollowService.setMode('route', this.map);
+
+      }
+
       await this.geolocationService.initGeolocationWatch(this.updateCoords, this.map);
       this.getVisits();
     }
-
   }
 
   updateCoords(position: Position) {
@@ -94,13 +110,14 @@ export class Tab1Page implements OnInit {
     });
   }
 
-  getVisits(): void {
-    this.visitService.getVisits("1").subscribe((resp: any) => {
-      this.visits.push(...resp.result);
-      this.createMarkers();
-      this.rearrangevisits();
-      this.startRearrangeInterval();
-    })
+  async getVisits() {
+    const visits = await this.localStorage.getVisits();
+    this.visits.length = 0;
+    this.visits.push(...visits);
+
+    this.createMarkers();
+    this.rearrangevisits();
+    this.startRearrangeInterval();
   }
 
   startRearrangeInterval(){
@@ -130,7 +147,6 @@ export class Tab1Page implements OnInit {
       return visit.visit_result == null;
     })
 
-    // this.sortByDistanceAsc(visited);
     this.sortByDistanceAsc(nonVisited);
 
     this.visits.length = 0;
@@ -161,6 +177,9 @@ export class Tab1Page implements OnInit {
 
     visit.visit_result = visitResult;
     const visitLongLat = visit.sale.client.location_longlat.split(',');
+
+    await this.localStorage.setVisits(this.visits);
+    await this.localStorage.clearObjective();
 
     marker.remove();
     marker = new mapboxgl.Marker({ color: visitResult.color, scale: 1.2 })
@@ -249,7 +268,6 @@ export class Tab1Page implements OnInit {
     if(!visited) {
       if(client) this.setObjectiveClient(client);
       this.mapFollowService.setMode('route', this.map);
-      // this.changeMapFollowingMode('route');
     } else {
       this.mapFollowService.setMode('free', this.map);
       this.routeService.objectiveCoords = '';

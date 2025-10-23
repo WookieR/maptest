@@ -1,25 +1,23 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
-import { take } from 'rxjs';
+import { firstValueFrom, take } from 'rxjs';
 
 @Injectable({
   providedIn: 'root'
 })
 export class VisitService {
-  private baseUrl = 'https://751674aba57c.ngrok-free.app/visits';
+  private baseUrl = 'https://c2f6586e0111.ngrok-free.app/visits';
 
   constructor(private http: HttpClient){ }
   
-  getVisits(worker_id: string) {
+  async getVisits(worker_id: string) {
     const query = "?worker_id=" + worker_id;
-
-    // const headers = new HttpHeaders();
-    // headers.set('ngrok-skip-browser-warning', '123456');
-    const headers = new HttpHeaders({'h1':'v1'});
     
-    return this.http.get(this.baseUrl + query, {
+    const observable = this.http.get(this.baseUrl + query, {
       headers: {'ngrok-skip-browser-warning':'123456'}
     }).pipe(take(1));
+
+    return await firstValueFrom(observable)
   }
 
   getVisit(visitId: string) {

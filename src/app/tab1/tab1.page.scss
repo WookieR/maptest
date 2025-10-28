@@ -28,16 +28,11 @@
   position: fixed;
   right: 0; /* Positions the element flush with the right edge of the viewport */
   top: 25%; /* Example: Positions the element 50px from the top edge */
-  /* Add other styling as needed, e.g., width, height, background-color */
   width: 65px;
   height: 200px;
-//   background-color: lightblue;
 }
 
-// .bottom-fixed-button {
-//     position: fixed;
-//     bottom: 0;
-//     width: 100%;
-//     display: flex;
-//     justify-content: center; /* Centers horizontally */
-// }
+.segment-view-disabled {
+    opacity: 0 !important;
+}
+

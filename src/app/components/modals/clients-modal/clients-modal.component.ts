@@ -13,7 +13,6 @@ export class ClientsModalComponent  implements OnInit {
   constructor(private modalCtrl: ModalController) { }
 
   ngOnInit() {
-    console.log(this.visits)
   }
 
   pickObjectiveClient(client: any, visit: any) {

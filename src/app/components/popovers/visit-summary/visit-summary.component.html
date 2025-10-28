@@ -1,0 +1,52 @@
+<div>
+  <ion-header>
+    <ion-toolbar>
+      <ion-title>
+        Confirmar Visita
+      </ion-title>
+    </ion-toolbar>
+  </ion-header>
+  <ion-content>
+    <ion-item>
+      
+      <ion-text ion-padding>
+        Se han registrado los siguientes pagos. Proceder?
+      </ion-text>
+
+    </ion-item>
+
+    <ion-accordion-group>
+      @for(quota of quotas; track quota) {
+        <ion-accordion [value]="'quota' + quota.id">
+          <ion-item slot="header" color="light">
+            <ion-label>Cuota {{ quota.id }} - ${{ quota.amount }}</ion-label>
+          </ion-item>
+          <div class="ion-padding" slot="content">
+            <ion-list>
+              @for(payment of quota.quota_payments; track payment){
+                @if(payment.created_date == null){
+                  <ion-item>
+                    <ion-label>{{payment.type}}: <span style="font-weight: 600;">{{payment.amount}}</span></ion-label>
+                  </ion-item>
+                }
+              }
+              
+            </ion-list>
+          </div>
+        </ion-accordion>
+      }
+    </ion-accordion-group>
+    
+    
+    <ion-toolbar>
+      <ion-buttons slot="end">
+        <ion-button color="danger" slot="end" (click)="close()">
+          Salir
+        </ion-button>
+        <ion-button color="primary" slot="end" type="submit" (click)="confirm()">
+          Confirmar
+        </ion-button>
+      </ion-buttons>
+    </ion-toolbar>
+  </ion-content>
+</div>

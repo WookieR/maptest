@@ -54,11 +54,15 @@ export class Tab1Page implements OnInit {
     let permissionsGranted = await this.permissionService.getGeolocationPermissionStatus(platform);
 
     if(permissionsGranted) {
+
+      await this.getVisits();
       
       const objective = await this.localStorage.getObjective();
 
       if(objective != null) {
         const currentPosition = await this.geolocationService.getCurrentPosition();
+
+        this.rearrangevisits();
 
         this.routeService.setObjective(objective);
         const currentCoords = currentPosition.coords.longitude +
@@ -70,7 +74,7 @@ export class Tab1Page implements OnInit {
       }
 
       await this.geolocationService.initGeolocationWatch(this.updateCoords, this.map);
-      this.getVisits();
+      
     }
   }
 
@@ -126,12 +130,14 @@ export class Tab1Page implements OnInit {
     }, 10000)
   };
 
-  rearrangevisits() {
+  async rearrangevisits() {
+
+    const currentPosition = await this.geolocationService.currentCoords;
 
     this.visits.map((visit) => {
-      const distance = haversineDistanceKM(this.geolocationService.currentCoords?.coords.longitude + 
+      const distance = haversineDistanceKM(currentPosition?.coords.longitude + 
                                             ',' +
-                                            this.geolocationService.currentCoords?.coords.latitude,
+                                            currentPosition?.coords.latitude,
                                             visit.sale.client.location_longlat);
 
       visit.distance = distance;
@@ -166,7 +172,8 @@ export class Tab1Page implements OnInit {
       cssClass: 'my-custom-modal',
       componentProps: {
         visit
-      }
+      },
+      backdropDismiss: false
     })
 
     modal.present()
@@ -253,7 +260,8 @@ export class Tab1Page implements OnInit {
       initialBreakpoint: 0.25,
       componentProps: {
         visits: this.visits
-      }
+      },
+      cssClass: 'opacity'
     });
     clientsModal.present()
 

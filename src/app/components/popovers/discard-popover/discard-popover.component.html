@@ -1,0 +1,32 @@
+<div>
+  <ion-header>
+    <ion-toolbar>
+      <ion-title>
+        Descartar Pagos
+      </ion-title>
+    </ion-toolbar>
+  </ion-header>
+  <ion-content>
+    
+    <ion-item>
+      
+      <ion-text ion-padding>
+        Esta seguro que desea salir sin finalizar la visita?
+        No se guardaran los cambios y la visita continuará pendiente
+      </ion-text>
+
+    </ion-item>
+    
+    
+    <ion-toolbar>
+      <ion-buttons slot="end">
+        <ion-button color="danger" slot="end" (click)="close()">
+          Salir
+        </ion-button>
+        <ion-button color="primary" slot="end" type="submit" (click)="confirm()">
+          Confirmar
+        </ion-button>
+      </ion-buttons>
+    </ion-toolbar>
+  </ion-content>
+</div>

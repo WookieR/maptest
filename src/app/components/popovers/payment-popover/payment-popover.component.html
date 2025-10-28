@@ -1,11 +1,32 @@
 <ion-content>
+  <ion-card>
+    <ion-card-header>
+      <ion-card-title>
+
+        <ion-title>
+          Total a Pagar
+        </ion-title>
+      </ion-card-title>
+    </ion-card-header>
+    <ion-card-content style="text-align: center;">
+      <ion-label>
+        <h1>${{limitToPay}}</h1>
+      </ion-label>
+    </ion-card-content>
+  </ion-card>
 
   <form [formGroup]="paymentForm" (submit)="addPayment()">
-    <ion-input formControlName="amount" label="Monto" label-placement="floating" fill="solid" placeholder="Ingresar monto..." type="number"></ion-input>
-    <ion-select formControlName="type" label="Tipo de pago" fill="solid" labelPlacement="floating" value="">
-      <ion-select-option value="cash">Efectivo</ion-select-option>
-      <ion-select-option value="transfer">Transferencia</ion-select-option>
-    </ion-select>
+    <ion-list>
+      <ion-item>
+        <ion-input (ionInput)="onIonInput($event, 'amount')" [errorText]="errorTexts.amount" formControlName="amount" label="Monto" label-placement="floating" fill="solid" placeholder="Ingresar monto..." type="number"></ion-input>
+      </ion-item>
+      <ion-item>
+        <ion-select formControlName="type" [errorText]="errorTexts.type" [interface]="'popover'" (ionInput)="onIonInput($event, 'type')" label="Tipo de pago" fill="solid" labelPlacement="floating" value="">
+          <ion-select-option value="Efectivo">Efectivo</ion-select-option>
+          <ion-select-option value="Transferencia">Transferencia</ion-select-option>
+        </ion-select>
+      </ion-item>
+    </ion-list>
     <ion-toolbar>
       <ion-buttons slot="end">
         <ion-button color="danger" slot="end" type="button" (click)="close()">

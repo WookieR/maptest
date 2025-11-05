@@ -6,7 +6,7 @@ import { firstValueFrom, take } from 'rxjs';
   providedIn: 'root'
 })
 export class VisitService {
-  private baseUrl = 'https://59c4c84c5911.ngrok-free.app/visits';
+  private baseUrl = 'http://localhost:3000/visits';
 
   constructor(private http: HttpClient){ }
   

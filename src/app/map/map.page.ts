@@ -1,11 +1,11 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, EventEmitter, OnInit } from '@angular/core';
 
 import { Position } from '@capacitor/geolocation';
 import * as mapboxgl from 'mapbox-gl';
 
 import { VisitService } from '../services/visit.service';
 import { VisitMarker } from '../interfaces/visit-marker';
-import { ModalController } from '@ionic/angular';
+import { LoadingController, ModalController, NavController } from '@ionic/angular';
 import { VisitModalComponent } from '../components/modals/visit-modal/visit-modal.component';
 import { PermissionService } from '../stores/permission.service';
 import { GeolocationService } from '../stores/geolocation.service';
@@ -16,6 +16,7 @@ import { MapFollowService } from '../stores/map-follow.service';
 import { calcBoundsFromCoordinates } from '../helpers/bound-coordinates';
 import { determineColor } from '../helpers/marker-color';
 import { LocalstorageService } from '../stores/localstorage.service'
+import { Router } from '@angular/router';
 
 
 @Component({
@@ -41,11 +42,20 @@ export class Tab1Page implements OnInit {
               private routeService: RouteService,
               private localStorage: LocalstorageService,
               // private visitService: VisitService,
-              private modalCtrl: ModalController
+              private modalCtrl: ModalController,
+              private router: Router,
+              private navCtrl: NavController,
+              private loadingCtrl: LoadingController
   ) {
   }
 
   async ngOnInit() {
+    const loading = await this.loadingCtrl.create({
+      spinner: 'crescent',
+      backdropDismiss: false,
+      message: '...Obteniendo recorrido'
+    });
+    loading.present();
     
     this.initializeMap();
 
@@ -74,7 +84,8 @@ export class Tab1Page implements OnInit {
       }
 
       await this.geolocationService.initGeolocationWatch(this.updateCoords, this.map);
-      
+
+      loading.dismiss();
     }
   }
 
@@ -131,7 +142,6 @@ export class Tab1Page implements OnInit {
   };
 
   async rearrangevisits() {
-
     const currentPosition = await this.geolocationService.currentCoords;
 
     this.visits.map((visit) => {
@@ -150,13 +160,18 @@ export class Tab1Page implements OnInit {
     });
 
     const nonVisited = this.visits.filter((visit: any) => {
-      return visit.visit_result == null;
+      return visit.visit_result == null && (visit.pending == null || visit.pending == false);
     })
+
+    const pending = this.visits.filter((visit: any) => {
+      return visit.visit_result == null && (visit.pending != null && visit.pending == true);
+    });
 
     this.sortByDistanceAsc(nonVisited);
 
     this.visits.length = 0;
-    this.visits.push(...nonVisited, ...visited);
+    this.visits.push(...nonVisited, ...pending, ...visited);
+    await this.localStorage.setVisits(this.visits);
   }
 
   sortByDistanceAsc(array: any) {
@@ -254,18 +269,27 @@ export class Tab1Page implements OnInit {
   }
 
   async openClientsSheetModal() {
-    const clientsModal = await this.modalCtrl.create({
+
+    const clientsModal: any = await this.modalCtrl.create({
       component: ClientsModalComponent,
       breakpoints: [0, 0.25, 0.5, 0.75],
       initialBreakpoint: 0.25,
       componentProps: {
-        visits: this.visits
+        visits: this.visits,
       },
+      
       cssClass: 'opacity'
     });
+  
     clientsModal.present()
 
-    const { data } = await clientsModal.onDidDismiss();
+    const { data, role } = await clientsModal.onDidDismiss();
+
+    if(role == 'markedAsPending'){
+      this.rearrangevisits();
+      this.openClientsSheetModal();
+      return;
+    }
 
     if(data == null) return;
 
@@ -300,5 +324,14 @@ export class Tab1Page implements OnInit {
 
   centerInSelf() {
     this.mapFollowService.centerInSelf(this.map);
+  }
+
+  async logout() {
+    await this.localStorage.clearStorage();
+    await this.geolocationService.stopGeolocationWatch();
+    this.map = null;
+    clearInterval(this.arrangeInterval);
+    // this.router.navigateByUrl('/auth');
+    this.navCtrl.navigateRoot('/auth');
   }
 }

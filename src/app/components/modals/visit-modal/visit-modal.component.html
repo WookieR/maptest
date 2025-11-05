@@ -10,8 +10,7 @@
       @if(visit.visit_result == null) {
         <ion-buttons slot="end">
           <ion-button (click)="finishVisit()" color="primary">
-            Finalizar
-            <ion-icon name="checkmark-outline"></ion-icon>
+            <ion-icon name="checkmark-circle-outline"></ion-icon>
           </ion-button>
         </ion-buttons>
       }
@@ -78,6 +77,12 @@
                 <ion-accordion [value]="'quota' + quota.id">
                   <ion-item slot="header" color="light">
                     <ion-label>Cuota {{ quota.id }} - ${{ quota.amount }}</ion-label>
+                    @if(quota.payment_completed){
+                      <ion-label [color]="'success'">
+                        {{'PAGADO'}}
+                        <ion-icon name="checkmark-circle-outline"></ion-icon>
+                      </ion-label>
+                    }
                   </ion-item>
                   <div class="ion-padding" slot="content">
                     <ion-list>
@@ -108,7 +113,7 @@
                       }
                     </ion-list>
 
-                    @if(detail.visit_result == null){
+                    @if(detail.visit_result == null && !quota.payment_completed){
                       <ion-button size="small" expand="block" fill="clear" (click)="openPaymentPopover($event, quota.id, quota)">
                         Registrar Pago
                         <ion-icon slot="end" name="add-outline"></ion-icon>

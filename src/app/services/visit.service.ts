@@ -1,40 +1,51 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
-import { firstValueFrom, take } from 'rxjs';
+import { first, firstValueFrom, take } from 'rxjs';
+import { environment } from 'src/environments/environment';
+import { LocalstorageService } from '../stores/localstorage.service';
 
 @Injectable({
   providedIn: 'root'
 })
 export class VisitService {
-  private baseUrl = 'http://localhost:3000/visits';
+  private baseUrl = environment.base_url;
+  private visitEndpoint = '/visits';
 
-  constructor(private http: HttpClient){ }
+  constructor(private http: HttpClient){
+
+  }
   
-  async getVisits(worker_id: string) {
-    const query = "?worker_id=" + worker_id;
-    
-    const observable = this.http.get(this.baseUrl + query, {
-      headers: {'ngrok-skip-browser-warning':'123456'}
+  async getVisits(token: string) {
+    const observable = this.http.get(this.baseUrl + this.visitEndpoint, {
+      headers: {'ngrok-skip-browser-warning':'123456', 'x-token': token}
     }).pipe(take(1));
 
     return await firstValueFrom(observable)
   }
 
-  getVisit(visitId: string) {
+  async getVisit(visitId: string, token: string) {
     const param = "/" + visitId;
 
-    return this.http.get(this.baseUrl + param, {
-      headers: {'ngrok-skip-browser-warning':'123456'}
+    const observable = this.http.get(this.baseUrl + this.visitEndpoint + param, {
+      headers: {'ngrok-skip-browser-warning':'123456', 'x-token': token}
     }).pipe(take(1));
+
+    return await firstValueFrom(observable);
+
+    // return this.http.get(this.baseUrl + this.visitEndpoint + param, {
+    //   headers: {'ngrok-skip-browser-warning':'123456', 'x-token': token}
+    // }).pipe(take(1));
   }
 
-  finishVisit(newPayments: any[], visitId: number, comment = null){
-    return this.http.post(this.baseUrl, {
+  async finishVisit(newPayments: any[], visitId: number, comment = null, token: string){
+    const observable = this.http.post(this.baseUrl + this.visitEndpoint, {
       visit_id: visitId,
       quota_payments: newPayments,
       commentary: comment
     }, {
-      headers: {'ngrok-skip-browser-warning':'123456'}
+      headers: {'ngrok-skip-browser-warning':'123456', 'x-token': token}
     }).pipe(take(1));
+
+    return await firstValueFrom(observable);
   }
 }

@@ -12,7 +12,7 @@ import { LocalstorageService } from './localstorage.service';
 export class GeolocationService {
   geolocationWatch: any;
   currentCoords: Position | null;
-  selfMarker: mapboxgl.Marker;
+  selfMarker: mapboxgl.Marker | null;
   recalculateCounter: number = 0;
 
   constructor (private routeService: RouteService,
@@ -26,6 +26,7 @@ export class GeolocationService {
 
   async initGeolocationWatch(updateCoordsFunc: Function, map: any) {
     this.geolocationWatch = await Geolocation.watchPosition({enableHighAccuracy: true}, async (position) => {
+      console.log(this.selfMarker);
       this.currentCoords = position;
       if(!this.selfMarker){
         const currentPositionMarker = new mapboxgl.Marker({
@@ -53,5 +54,12 @@ export class GeolocationService {
         if(this.routeService.objectiveCoords != null) await this.routeService.recalculateRoute(position?.coords.longitude + ',' + position?.coords.latitude, map);
       }
     });
+  }
+
+  async stopGeolocationWatch() {
+    this.recalculateCounter = 0;
+    this.currentCoords = null;
+    this.selfMarker = null;
+    await Geolocation.clearWatch(this.geolocationWatch);
   }
 }

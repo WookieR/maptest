@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { Preferences } from '@capacitor/preferences';
 import { VisitService } from '../services/visit.service';
 import { firstValueFrom } from 'rxjs';
+import { Router } from '@angular/router';
 
 @Injectable({
   providedIn: 'root'
@@ -9,9 +10,29 @@ import { firstValueFrom } from 'rxjs';
 export class LocalstorageService {
   visits: any = [];
   objective: string | null = null;
+  token: string | null;
 
-  constructor(private visitService: VisitService) {
+  constructor(private visitService: VisitService, private router: Router) {
     
+  }
+
+  async setToken(token: string) {
+    this.token = token;
+    await Preferences.set({key: 'token', value: token});
+  }
+
+  async clearStorage() {
+    this.visits = [];
+    this.token = null,
+    await Preferences.clear()
+  }
+
+  async getToken(){
+    if(!this.token) {
+      this.token = (await Preferences.get({key: 'token'})).value;
+    }
+
+    return this.token;
   }
 
   async getVisits() {
@@ -40,16 +61,21 @@ export class LocalstorageService {
       return;
     }
 
-    const response: any = await this.visitService.getVisits('1');
-
-    await Preferences.set({
-      key: 'visits',
-      value: JSON.stringify(response.result)
-    });
-
-    this.visits.push(...response.result);
-
-    return;
+    try {
+      const response: any = await this.visitService.getVisits(this.token ?? '');
+  
+      await Preferences.set({
+        key: 'visits',
+        value: JSON.stringify(response.result)
+      });
+  
+      this.visits.push(...response.result);
+  
+      return;
+    } catch (e) {
+      await Preferences.clear();
+      this.router.navigate(['auth'])
+    }
   }
 
   async getObjective() {

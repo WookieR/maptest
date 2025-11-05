@@ -14,11 +14,11 @@ export class VisitSummaryComponent  implements OnInit {
 
   ngOnInit() {
     this.quotas = this.quotas.filter((quota: any) => {
-      // quota.quota_payments = quota.quota_payments.filter((quota_payment: any) => {
-      //   return quota_payment.created_date == null
-      // });
+      const hasPaymentsInThisVisit = quota.quota_payments.filter((payment: any) => {
+        return payment.created_at == null
+      });
 
-      return quota.quota_payments.length > 0
+      return hasPaymentsInThisVisit.length > 0
     })
   }
 

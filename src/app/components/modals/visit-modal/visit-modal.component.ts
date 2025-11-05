@@ -1,5 +1,5 @@
 import { ChangeDetectorRef, Component, Input, NgZone, OnInit } from '@angular/core';
-import { IonicModule, ModalController, PopoverController, ToastController } from "@ionic/angular";
+import { IonicModule, LoadingController, ModalController, PopoverController, ToastController } from "@ionic/angular";
 import { VisitService } from 'src/app/services/visit.service';
 import { PaymentPopoverComponent } from '../../popovers/payment-popover/payment-popover.component';
 import { CommentaryPopoverComponent } from '../../popovers/commentary-popover/commentary-popover.component';
@@ -9,6 +9,8 @@ import { DiscardPopoverComponent } from '../../popovers/discard-popover/discard-
 import { PaymentDeletePopoverComponent } from '../../popovers/payment-delete-popover/payment-delete-popover.component';
 import { getTotalRemaining } from 'src/app/helpers/total';
 import { VisitSummaryComponent } from '../../popovers/visit-summary/visit-summary.component';
+import { LocalstorageService } from 'src/app/stores/localstorage.service';
+import { Router } from '@angular/router';
 
 @Component({
   selector: 'app-visit-modal',
@@ -27,24 +29,56 @@ export class VisitModalComponent  implements OnInit {
 
   status: string;
 
+  loadingThing: any;
+
   constructor(private modalCtrl: ModalController,
               private popoverCtrl: PopoverController,
               private visitService: VisitService,
-              private toastCtrl: ToastController
+              private toastCtrl: ToastController,
+              private localStorageService: LocalstorageService,
+              private router: Router,
+              private loadingCtrl: LoadingController
   ) {
     this.isLoading = true;
   }
 
-  ngOnInit() {
+  async ngOnInit() {
     this.isLoading = true;
 
-    this.visitService.getVisit(this.visit.id).subscribe((resp: any) => {
-      this.isLoading = false;
-
-      this.detail = resp.result;
-
-      this.status = this.determineStatus(resp.result.visit_result);
+    this.loadingThing = await this.loadingCtrl.create({
+      spinner: 'crescent',
+      backdropDismiss: false,
+      message: '...Finalizando Visita'
     });
+
+    try{
+      const resp: any = await this.visitService.getVisit(this.visit.id, this.localStorageService.token ?? '');
+  
+      this.isLoading = false;
+  
+      const quotas = [...resp.result.sale.quotas];
+  
+      resp.result.sale.quotas.length = 0;
+  
+      const unPaidQuotas = quotas.filter((quota: any) => {
+        return !quota.payment_completed
+      });
+      const paidQuotas = quotas.filter((quota: any) => {
+        return quota.payment_completed
+      });
+  
+      resp.result.sale.quotas.push(...unPaidQuotas);
+      resp.result.sale.quotas.push(...paidQuotas);
+  
+      this.detail = resp.result;
+  
+      this.status = this.determineStatus(resp.result.visit_result);
+    } catch(e) {
+      this.isLoading = false;
+      await this.localStorageService.clearStorage();
+      this.router.navigate(['auth'])
+    }
+
   }
 
   determineStatus(visitResult: any) {
@@ -141,15 +175,26 @@ export class VisitModalComponent  implements OnInit {
 
       const {data: comment, role} = await commentaryPopover.onDidDismiss();
       
-      if(role == 'close' || role == 'backdrop') return;
+      if(role == 'close' || role == 'backdrop') return;     
 
-      this.visitService.finishVisit([], this.visit.id, comment).subscribe(async (resp: any) => {
+      try {
+        this.loadingThing.present();
+
+        const resp: any = await this.visitService.finishVisit([], this.visit.id, comment, this.localStorageService.token ?? '');
+
         const visitResult = this.buildVisitResult([], this.detail.target_amount, resp)
+
+        this.loadingThing.dismiss();
 
         await this.showSuccessToast();
         
         this.modalCtrl.dismiss(visitResult, 'dismiss')
-      });
+
+      } catch (e) {
+        this.loadingThing.dismiss();
+        await this.localStorageService.clearStorage();
+        this.router.navigate(['auth']);
+      }
     } else {
       console.log(this.detail)
       const visitSummaryPopover = await this.popoverCtrl.create({
@@ -168,13 +213,23 @@ export class VisitModalComponent  implements OnInit {
       const payments = this.newPayments.length > 0 ? this.newPayments.flatMap((quotaPayment: any) => quotaPayment.payments) :
                                                       null;
 
-      this.visitService.finishVisit(this.newPayments, this.visit.id).subscribe(async (resp: any) => {
+      try{
+        this.loadingThing.present();
+
+        const resp: any = await this.visitService.finishVisit(this.newPayments, this.visit.id, null, this.localStorageService.token ?? '');
+
         const visitResult = this.buildVisitResult(payments, this.detail.target_amount, resp)
+
+        this.loadingThing.dismiss();
 
         await this.showSuccessToast();
 
         this.modalCtrl.dismiss(visitResult, 'dismiss')
-      });
+      } catch(e) {
+        this.loadingThing.dismiss();
+        await this.localStorageService.clearStorage();
+        this.router.navigate(['auth']);
+      }
     }
   }
 

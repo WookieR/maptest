@@ -1,9 +1,21 @@
-<ion-content [fullscreen]="true">
-  <ion-header collapse="condense">
-    <ion-toolbar>
-      <ion-title size="large">auth</ion-title>
-    </ion-toolbar>
-  </ion-header>
-  
-  
+<ion-header collapse="condense">
+  <ion-toolbar>
+    <ion-title size="large">auth</ion-title>
+  </ion-toolbar>
+</ion-header>
+<ion-content [fullscreen]="true" class="ion-text-center">
+  <div class="form-container">
+    <form [formGroup]="loginForm" (submit)="submit()">
+      <ion-text>
+        <h1>Ingreso a TaionnerCobradores</h1>
+      </ion-text>
+      <ion-list>
+        <ion-item>
+          <ion-label position="floating">DNI:</ion-label>
+          <ion-input type="password" formControlName="dni"></ion-input>
+        </ion-item>
+      </ion-list>
+      <ion-button expand="block" fill="clear" shape="round" color="primary" type="submit">Ingresar</ion-button>
+    </form>
+  </div>
 </ion-content>

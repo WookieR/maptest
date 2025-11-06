@@ -2,10 +2,12 @@ import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
 import { AuthService } from '../services/auth.service';
 import { LocalstorageService } from '../stores/localstorage.service';
+import { GeolocationService } from '../stores/geolocation.service';
 
 export const AuthGuard: CanActivateFn = async (route, state) => {
   const authService = inject(AuthService);
   const localStorageService = inject(LocalstorageService);
+  const geolocationService = inject(GeolocationService);
   const router = inject(Router);
   
   try{

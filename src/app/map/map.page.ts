@@ -83,6 +83,7 @@ export class Tab1Page implements OnInit {
 
       }
 
+      await this.geolocationService.getCurrentPosition();
       await this.geolocationService.initGeolocationWatch(this.updateCoords, this.map);
 
       loading.dismiss();
@@ -327,11 +328,13 @@ export class Tab1Page implements OnInit {
   }
 
   async logout() {
+    window.location.reload();
     await this.localStorage.clearStorage();
-    await this.geolocationService.stopGeolocationWatch();
-    this.map = null;
-    clearInterval(this.arrangeInterval);
-    // this.router.navigateByUrl('/auth');
-    this.navCtrl.navigateRoot('/auth');
+    // await this.geolocationService.stopGeolocationWatch();
+    // this.map?.remove();
+    // this.map = null;
+    // clearInterval(this.arrangeInterval);
+    // // this.router.navigateByUrl('/auth');
+    // this.navCtrl.navigateRoot('/auth');
   }
 }

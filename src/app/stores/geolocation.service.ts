@@ -19,14 +19,17 @@ export class GeolocationService {
               private localStorage: LocalstorageService) {}
 
   async getCurrentPosition() {
-    const position = await Geolocation.getCurrentPosition({enableHighAccuracy: true});
+    const position = await Geolocation.getCurrentPosition({enableHighAccuracy: true, maximumAge: 0, timeout: 10000});
+
+    this.currentCoords = position;
 
     return position;
   }
 
   async initGeolocationWatch(updateCoordsFunc: Function, map: any) {
     this.geolocationWatch = await Geolocation.watchPosition({enableHighAccuracy: true}, async (position) => {
-      console.log(this.selfMarker);
+      if(position == null) return;
+
       this.currentCoords = position;
       if(!this.selfMarker){
         const currentPositionMarker = new mapboxgl.Marker({

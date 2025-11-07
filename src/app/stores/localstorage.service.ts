@@ -63,7 +63,7 @@ export class LocalstorageService {
 
     try {
       const response: any = await this.visitService.getVisits(this.token ?? '');
-  
+      
       await Preferences.set({
         key: 'visits',
         value: JSON.stringify(response.result)

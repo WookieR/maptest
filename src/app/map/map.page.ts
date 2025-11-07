@@ -5,7 +5,7 @@ import * as mapboxgl from 'mapbox-gl';
 
 import { VisitService } from '../services/visit.service';
 import { VisitMarker } from '../interfaces/visit-marker';
-import { LoadingController, ModalController, NavController } from '@ionic/angular';
+import { LoadingController, ModalController, NavController, PopoverController } from '@ionic/angular';
 import { VisitModalComponent } from '../components/modals/visit-modal/visit-modal.component';
 import { PermissionService } from '../stores/permission.service';
 import { GeolocationService } from '../stores/geolocation.service';
@@ -17,6 +17,7 @@ import { calcBoundsFromCoordinates } from '../helpers/bound-coordinates';
 import { determineColor } from '../helpers/marker-color';
 import { LocalstorageService } from '../stores/localstorage.service'
 import { Router } from '@angular/router';
+import { SelectSalePopoverComponent } from '../components/popovers/select-sale-popover/select-sale-popover.component';
 
 
 @Component({
@@ -43,6 +44,7 @@ export class Tab1Page implements OnInit {
               private localStorage: LocalstorageService,
               // private visitService: VisitService,
               private modalCtrl: ModalController,
+              private popoverCtrl: PopoverController,
               private router: Router,
               private navCtrl: NavController,
               private loadingCtrl: LoadingController
@@ -183,11 +185,36 @@ export class Tab1Page implements OnInit {
 
   async markerClicked(visit: any, marker: mapboxgl.Marker){
 
+    const foundVisits = this.visits.filter((availableVisit: any) => {
+      return availableVisit.client_id == visit.client_id
+    });
+
+    let selectedVisit = visit;
+
+    console.log(visit);
+
+    if(foundVisits.length > 1){
+      const visitSelectPopover = await this.popoverCtrl.create({
+        component: SelectSalePopoverComponent,
+        componentProps: {
+          visits: foundVisits
+        },
+        backdropDismiss: false
+      })
+      visitSelectPopover.present();
+
+      const {data: resultVisit} = await visitSelectPopover.onDidDismiss();
+
+      if (resultVisit == null) return;
+
+      selectedVisit = resultVisit
+    }
+
     const modal = await this.modalCtrl.create({
       component: VisitModalComponent,
       cssClass: 'my-custom-modal',
       componentProps: {
-        visit
+        visit: selectedVisit
       },
       backdropDismiss: false
     })

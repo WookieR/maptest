@@ -1,0 +1,37 @@
+<div>
+  <ion-header>
+    <ion-toolbar>
+      <ion-title>
+        Seleccionar Credito
+      </ion-title>
+    </ion-toolbar>
+  </ion-header>
+  <ion-content>
+
+    <ion-list>
+      <ion-list-header>
+        <ion-text ion-padding>
+          Se han detectado multiples creditos en este cliente.
+          Seleccione con cual desea operar
+        </ion-text>
+      </ion-list-header>
+      @for(visit of visits; track visit) {
+        <ion-item (click)="select(visit)">
+          <ion-label>{{visit.sale.details[0].product.name}} - ${{visit.sale.details[0].price}}</ion-label>
+          @if(visit.visit_result != null) {
+            <ion-label color="success">Visitado <ion-icon name="checkmark-circle-outline"></ion-icon></ion-label>
+          }
+        </ion-item>
+      }
+    </ion-list>
+    
+    
+    <ion-toolbar>
+      <ion-buttons slot="end">
+        <ion-button color="danger" slot="end" (click)="close()">
+          Salir
+        </ion-button>
+      </ion-buttons>
+    </ion-toolbar>
+  </ion-content>
+</div>

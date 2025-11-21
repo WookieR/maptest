@@ -1,4 +1,4 @@
 export const environment = {
-  production: true,
-  base_url: 'https://2b1d8a64cdc7.ngrok-free.app'
+  production: false,
+  base_url: 'https://taionner-admin-vj2ey.ondigitalocean.app/api'
 };

@@ -11,6 +11,7 @@ import { getTotalRemaining } from 'src/app/helpers/total';
 import { VisitSummaryComponent } from '../../popovers/visit-summary/visit-summary.component';
 import { LocalstorageService } from 'src/app/stores/localstorage.service';
 import { Router } from '@angular/router';
+import { isToday, startOfDay, format, isSameDay } from 'date-fns';
 
 @Component({
   selector: 'app-visit-modal',
@@ -20,16 +21,12 @@ import { Router } from '@angular/router';
 })
 export class VisitModalComponent  implements OnInit {
   @Input() visit: any;
-
   newPayments: any = [];
-
   isLoading: boolean;
-
   detail: any;
-
   status: string;
-
   loadingThing: any;
+  todayDate: any =  format(startOfDay(new Date()), 'dd-MM-yyyy');
 
   constructor(private modalCtrl: ModalController,
               private popoverCtrl: PopoverController,
@@ -62,10 +59,12 @@ export class VisitModalComponent  implements OnInit {
   
       const unPaidQuotas = quotas.filter((quota: any) => {
         return !quota.payment_completed
-      });
+      }).sort((a, b) => a.created_at.localeCompare(b.created_at));
+
+
       const paidQuotas = quotas.filter((quota: any) => {
         return quota.payment_completed
-      });
+      }).sort((a, b) => a.created_at.localeCompare(b.created_at));
   
       resp.result.sale.quotas.push(...unPaidQuotas);
       resp.result.sale.quotas.push(...paidQuotas);
@@ -297,6 +296,12 @@ export class VisitModalComponent  implements OnInit {
   updateNewPayments(updatedPayment: any = null, quotaIdx: number) {
     this.newPayments[quotaIdx].payments[updatedPayment.index].amount = updatedPayment.amount;
     this.newPayments[quotaIdx].payments[updatedPayment.index].type = updatedPayment.type;
+  }
+
+  isToday(quota: any): boolean{
+    if(isSameDay(quota.created_date, this.todayDate)) return true;
+
+    return false;
   }
 
   async back() {

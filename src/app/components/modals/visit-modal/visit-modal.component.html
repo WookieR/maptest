@@ -76,15 +76,23 @@
               @for(quota of detail.sale.quotas; track quota.id; let quotaIdx = $index){
                 <ion-accordion [value]="'quota' + quota.id">
                   <ion-item slot="header" color="light">
-                    <ion-label>Cuota {{ quota.expire_date_readable }} - ${{ quota.amount }}</ion-label>
+                    <ion-label>Cuota {{ quota.created_date }}
+                    </ion-label>
+                    @if(isToday(quota)){
+                      <ion-chip color="primary">HOY</ion-chip>
+                    }
                     @if(quota.payment_completed){
-                      <ion-label [color]="'success'">
+                      <ion-chip color="success">PAGADO</ion-chip>
+                      <!-- <ion-label [color]="'success'">
                         {{'PAGADO'}}
                         <ion-icon name="checkmark-circle-outline"></ion-icon>
-                      </ion-label>
+                      </ion-label> -->
                     }
                   </ion-item>
                   <div class="ion-padding" slot="content">
+                    <ion-list-header>
+                      <ion-label>Valor de Cuota: ${{ quota.amount }}</ion-label>
+                    </ion-list-header>
                     <ion-list>
                       @for(quotaPayment of quota.quota_payments; track quotaPayment; let paymentIdx = $index){
                         <ion-item-sliding>

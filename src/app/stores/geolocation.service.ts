@@ -19,7 +19,7 @@ export class GeolocationService {
               private localStorage: LocalstorageService) {}
 
   async getCurrentPosition() {
-    const position = await Geolocation.getCurrentPosition({enableHighAccuracy: true, maximumAge: 0, timeout: 10000});
+    const position = await Geolocation.getCurrentPosition({enableHighAccuracy: true, maximumAge: 0, timeout: 30000});
 
     this.currentCoords = position;
 
@@ -27,7 +27,7 @@ export class GeolocationService {
   }
 
   async initGeolocationWatch(updateCoordsFunc: Function, map: any) {
-    this.geolocationWatch = await Geolocation.watchPosition({enableHighAccuracy: true}, async (position) => {
+    this.geolocationWatch = await Geolocation.watchPosition({enableHighAccuracy: true, minimumUpdateInterval: 5000}, async (position) => {
       if(position == null) return;
 
       this.currentCoords = position;
@@ -54,7 +54,7 @@ export class GeolocationService {
       } else {
         if (position) this.selfMarker.setLngLat([position?.coords.longitude, position?.coords.latitude]);
 
-        if(this.routeService.objectiveCoords != null) await this.routeService.recalculateRoute(position?.coords.longitude + ',' + position?.coords.latitude, map);
+        // if(this.routeService.objectiveCoords != null) await this.routeService.recalculateRoute(position?.coords.longitude + ',' + position?.coords.latitude, map);
       }
     });
   }

@@ -8,7 +8,7 @@ import { Router } from '@angular/router';
   providedIn: 'root'
 })
 export class LocalstorageService {
-  visits: any = [];
+  clients: any[] = [];
   objective: string | null = null;
   token: string | null;
 
@@ -21,11 +21,45 @@ export class LocalstorageService {
     await Preferences.set({key: 'token', value: token});
   }
 
-  async clearStorage() {
-    this.visits = [];
-    this.token = null,
-    await Preferences.clear()
+  async getClients() {
+    if(this.clients.length < 1){
+      const clientsFromMemory = await Preferences.get({key: 'clients'});
+
+      if(clientsFromMemory.value == null){
+        const resp: any = await this.visitService.getVisits(this.token!);
+        this.clients.push(...resp.result);
+        await this.saveClients();
+      } else {
+        this.clients = JSON.parse(clientsFromMemory.value);
+      }
+
+      return this.clients;
+    } else {
+      return this.clients;
+    }
   }
+
+  async saveClients() {
+    await Preferences.set({key: 'clients', value: JSON.stringify(this.clients)});
+  }
+
+  async updateClientsInMemory(clients: any) {
+    this.clients.length = 0;
+    this.clients.push(...clients.map((client: any) => {
+      // delete client.marker;
+      return {
+        ...client,
+        marker: null
+      }
+    }))
+    await this.saveClients();
+  }
+
+  // async clearStorage() {
+  //   this.visits = [];
+  //   this.token = null,
+  //   await Preferences.clear()
+  // }
 
   async getToken(){
     if(!this.token) {
@@ -33,66 +67,6 @@ export class LocalstorageService {
     }
 
     return this.token;
-  }
-
-  async getVisits() {
-    if(this.visits.length < 1) await this.setVisits();
-
-    return this.visits;
-  }
-
-  async setVisits(visits: any = null) {
-    if(visits) {
-      await Preferences.set({
-        key: 'visits',
-        value: JSON.stringify(visits)
-      });
-
-      this.visits.length = 0;
-      this.visits.push(...visits);
-      return;
-    }
-
-    const { value: visitsFromStorage } = await Preferences.get({key: 'visits'});
-
-    if(visitsFromStorage != null){
-      this.visits.length = 0;
-      this.visits.push(...JSON.parse(visitsFromStorage));
-      return;
-    }
-
-    try {
-      const response: any = await this.visitService.getVisits(this.token ?? '');
-      
-      await Preferences.set({
-        key: 'visits',
-        value: JSON.stringify(response.result)
-      });
-  
-      this.visits.push(...response.result);
-  
-      return;
-    } catch (e) {
-      await Preferences.clear();
-      this.router.navigate(['auth'])
-    }
-  }
-
-  async getObjective() {
-    const { value: objective } = await Preferences.get({key: 'objective'});
-
-    return objective;
-  }
-
-  async setObjective(coords: string) {
-    await Preferences.set({
-      key: 'objective',
-      value: coords
-    });
-  }
-
-  async clearObjective() {
-    await Preferences.remove({key: 'objective'});
   }
   
 }

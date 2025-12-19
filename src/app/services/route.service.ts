@@ -22,10 +22,10 @@ export class RouteService {
               private localstorageService: LocalstorageService){
   }
 
-  setObjective(coords: string) {
-    this.objectiveCoords = coords;
-    this.localstorageService.setObjective(coords)
-  }
+  // setObjective(coords: string) {
+  //   this.objectiveCoords = coords;
+  //   this.localstorageService.setObjective(coords)
+  // }
 
   async recalculateRoute(currentCoords: string, map: any, setNow = false) {
     if(this.objectiveCoords == '') return;

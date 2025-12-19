@@ -1,5 +1,5 @@
 import { ChangeDetectorRef, Component, Input, NgZone, OnInit } from '@angular/core';
-import { IonicModule, LoadingController, ModalController, PopoverController, ToastController } from "@ionic/angular";
+import { IonicModule, LoadingController, ModalController, Platform, PopoverController, ToastController, ViewWillEnter, ViewWillLeave } from "@ionic/angular";
 import { VisitService } from 'src/app/services/visit.service';
 import { PaymentPopoverComponent } from '../../popovers/payment-popover/payment-popover.component';
 import { CommentaryPopoverComponent } from '../../popovers/commentary-popover/commentary-popover.component';
@@ -12,6 +12,11 @@ import { VisitSummaryComponent } from '../../popovers/visit-summary/visit-summar
 import { LocalstorageService } from 'src/app/stores/localstorage.service';
 import { Router } from '@angular/router';
 import { isToday, startOfDay, format, isSameDay } from 'date-fns';
+import { OfflinePayService } from 'src/app/services/offline-pay.service';
+import { buildVisitResult } from 'src/app/helpers/visit-result';
+import { syncQuotas } from 'src/app/helpers/quotas-sync';
+import { App } from '@capacitor/app';
+import { Subscription } from 'rxjs';
 
 @Component({
   selector: 'app-visit-modal',
@@ -19,100 +24,81 @@ import { isToday, startOfDay, format, isSameDay } from 'date-fns';
   styleUrls: ['./visit-modal.component.scss'],
   imports: [IonicModule],
 })
-export class VisitModalComponent  implements OnInit {
-  @Input() visit: any;
+export class VisitModalComponent  implements OnInit, ViewWillEnter, ViewWillLeave {
+  @Input() client: any;
   newPayments: any = [];
+  newSimplePayments: any = [];
   isLoading: boolean;
   detail: any;
   status: string;
   loadingThing: any;
+  @Input() saleIndex: number;
   todayDate: any =  format(startOfDay(new Date()), 'dd-MM-yyyy');
+  backButtonSubscription: Subscription;
+  
 
   constructor(private modalCtrl: ModalController,
               private popoverCtrl: PopoverController,
               private visitService: VisitService,
+              private offlinePay: OfflinePayService,
               private toastCtrl: ToastController,
               private localStorageService: LocalstorageService,
               private router: Router,
-              private loadingCtrl: LoadingController
+              private loadingCtrl: LoadingController,
+              private platform: Platform
   ) {
-    this.isLoading = true;
+  }
+
+  ionViewWillEnter(): void {
+    this.backButtonSubscription = this.platform.backButton.subscribeWithPriority(120, () => {
+      this.back();
+    });
+  }
+  
+  ionViewWillLeave(): void {
+    if(this.backButtonSubscription) {
+      this.backButtonSubscription.unsubscribe()
+    }
   }
 
   async ngOnInit() {
-    this.isLoading = true;
-
     this.loadingThing = await this.loadingCtrl.create({
       spinner: 'crescent',
       backdropDismiss: false,
       message: '...Finalizando Visita'
     });
 
-    try{
-      const resp: any = await this.visitService.getVisit(this.visit.id, this.localStorageService.token ?? '');
-  
-      this.isLoading = false;
-  
-      const quotas = [...resp.result.sale.quotas];
-  
-      resp.result.sale.quotas.length = 0;
-  
-      const unPaidQuotas = quotas.filter((quota: any) => {
-        return !quota.payment_completed
-      }).sort((a, b) => a.created_at.localeCompare(b.created_at));
-
-
-      const paidQuotas = quotas.filter((quota: any) => {
-        return quota.payment_completed
-      }).sort((a, b) => a.created_at.localeCompare(b.created_at));
-  
-      resp.result.sale.quotas.push(...unPaidQuotas);
-      resp.result.sale.quotas.push(...paidQuotas);
-  
-      this.detail = resp.result;
-  
-      this.status = this.determineStatus(resp.result.visit_result);
-    } catch(e) {
-      this.isLoading = false;
-      await this.localStorageService.clearStorage();
-      this.router.navigate(['auth'])
-    }
+    this.newSimplePayments = this.client.sales[this.saleIndex].newPayments != null ? this.client.sales[this.saleIndex].newPayments : []
 
   }
 
-  determineStatus(visitResult: any) {
-    if(!visitResult) return 'Pendiente';
+  getSaleRemaining() {
+    const total = parseFloat(this.client.sales[this.saleIndex].total);
 
-    const targetAmount = parseFloat(this.visit.target_amount);
 
-    const totalPaid = visitResult.payments.reduce((accumulator: any, currentValue: any) => {
-      return accumulator + parseFloat(currentValue.amount);
-    }, 0.0);
 
-    if(totalPaid == 0){
-      return 'Impaga';
-    }
+    const totalPaidFromSimplePayments = this.newSimplePayments.reduce((accu: any, current: any) => accu += parseFloat(current.amount), 0.0);
+    // // const totalFromNewQuotaPayments = this.newPayments.flatMap((newQuotaPayment: any) => newQuotaPayment.payments)
+    // //                                                   .reduce((accu: any, current: any) => accu += parseFloat(current.amount), 0.0);
 
-    if(totalPaid < targetAmount){
-      return 'Pago Parcial'
-    }
+    const totalFromQuotaPayments = this.client.sales[this.saleIndex].quotas.flatMap((quota: any) => quota.quota_payments)
+                                                          .reduce((accu: any, current: any) => accu += parseFloat(current.amount), 0.0);
+    const remaining = total - (totalPaidFromSimplePayments + totalFromQuotaPayments);
 
-    if(totalPaid >= targetAmount){
-      return 'Pago Completo'
-    }
+    // console.log(totalFromQuotaPayments);
 
-    return 'Pendiente'
+    return remaining;
   }
 
-  async openPaymentPopover(e: Event, quotaId: number, quota: any) {
-    const remaining = getTotalRemaining(quota);
+  async openSimplePaymentPopover() {
+    const remaining = this.getSaleRemaining()
 
     const paymentPopover = await this.popoverCtrl.create({
       component: PaymentPopoverComponent,
       componentProps: {
-        limitToPay: remaining
+        limitToPay: remaining,
+        simple: true
       },
-      // event: e,
       backdropDismiss: false
     });
     paymentPopover.present();
@@ -121,191 +107,202 @@ export class VisitModalComponent  implements OnInit {
 
     if(payment == null) return;
 
-    const foundQuotaPayments = this.newPayments.find((quotaPayment: any) => {
-      return quotaPayment.quota_id == quotaId;
-    });
-
-    if(foundQuotaPayments){
-      const index = foundQuotaPayments.payments.push(payment) - 1;
-      foundQuotaPayments.payments[index].index = index;
-    } else {
-      payment.index = 0;
-      this.newPayments.push({
-        quota_id: quotaId,
-        payments: [payment]
-      });
-    }
-
-    const foundVisitQuota = this.detail.sale.quotas.find((quota: any) => {
-      return quota.id == quotaId;
-    })
-
-    foundVisitQuota.quota_payments.push(payment)
-
+    this.newSimplePayments.push(payment);
+    this.client.sales[this.saleIndex].newPayments = this.newSimplePayments;
+    // syncQuotas(payment, this.client.sales[this.saleIndex].quotas);
   }
 
-  private async showSuccessToast() {
-    const toastCtrl = await this.toastCtrl.create({
-          message: 'La visita fue completada exitosamente!',
-          position: 'bottom',
-          duration: 1500,
-          color: 'success',
-        });
-    toastCtrl.present();
-  }
+  
 
-  private buildVisitResult(payments: any, target_amount: any, resp: any) {
-    const visitResult = {
-      ...resp.result,
-      created_date: moment().format('DD/MM/YYYY hh:mm'),
-      color: determineColor(payments, target_amount),
-      payments: payments
-    };
+  // async openPaymentPopover(e: Event, quotaId: number, quota: any) {
+  //   const remaining = getTotalRemaining(quota);
 
-    return visitResult;
-  }
+  //   const paymentPopover = await this.popoverCtrl.create({
+  //     component: PaymentPopoverComponent,
+  //     componentProps: {
+  //       limitToPay: remaining,
+  //       simple: false
+  //     },
+  //     // event: e,
+  //     backdropDismiss: false
+  //   });
+  //   paymentPopover.present();
+
+  //   const { data: payment } = await paymentPopover.onDidDismiss();
+
+  //   if(payment == null) return;
+
+  //   const foundQuotaPayments = this.newPayments.find((quotaPayment: any) => {
+  //     return quotaPayment.quota_id == quotaId;
+  //   });
+
+  //   if(foundQuotaPayments){
+  //     const index = foundQuotaPayments.payments.push(payment) - 1;
+  //     foundQuotaPayments.payments[index].index = index;
+  //   } else {
+  //     payment.index = 0;
+  //     this.newPayments.push({
+  //       quota_id: quotaId,
+  //       payments: [payment]
+  //     });
+  //   }
+
+  //   const foundVisitQuota = this.detail.sale.quotas.find((quota: any) => {
+  //     return quota.id == quotaId;
+  //   })
+
+  //   foundVisitQuota.quota_payments.push(payment)
+
+  // }
+
+  // private async showSuccessToast() {
+  //   const toastCtrl = await this.toastCtrl.create({
+  //         message: 'La visita fue completada exitosamente!',
+  //         position: 'bottom',
+  //         duration: 1500,
+  //         color: 'success',
+  //       });
+  //   toastCtrl.present();
+  // }
 
   async finishVisit() {
-    if(this.newPayments.length < 1){
-      const commentaryPopover = await this.popoverCtrl.create({
-        component: CommentaryPopoverComponent
-      });
-      commentaryPopover.present();
-
-      const {data: comment, role} = await commentaryPopover.onDidDismiss();
-      
-      if(role == 'close' || role == 'backdrop') return;     
-
-      try {
-        this.loadingThing.present();
-
-        const resp: any = await this.visitService.finishVisit([], this.visit.id, comment, this.localStorageService.token ?? '');
-
-        const visitResult = this.buildVisitResult([], this.detail.target_amount, resp)
-
-        this.loadingThing.dismiss();
-
-        await this.showSuccessToast();
-        
-        this.modalCtrl.dismiss(visitResult, 'dismiss')
-
-      } catch (e) {
-        this.loadingThing.dismiss();
-        await this.localStorageService.clearStorage();
-        this.router.navigate(['auth']);
-      }
-    } else {
-      console.log(this.detail)
+    
       const visitSummaryPopover = await this.popoverCtrl.create({
         component: VisitSummaryComponent,
         componentProps: {
-          quotas: [...this.detail.sale.quotas]
+          payments: this.newSimplePayments
         },
         backdropDismiss: false
       });
       visitSummaryPopover.present();
 
-      const { data: result } = await visitSummaryPopover.onDidDismiss();
+      const { data: result, role } = await visitSummaryPopover.onDidDismiss();
 
       if(result != true) return;
 
-      const payments = this.newPayments.length > 0 ? this.newPayments.flatMap((quotaPayment: any) => quotaPayment.payments) :
-                                                      null;
+      let commentary = null;
 
-      try{
-        this.loadingThing.present();
+      if(this.newSimplePayments.length < 1){
+        const commentaryPopover = await this.popoverCtrl.create({
+          component: CommentaryPopoverComponent
+        });
+        commentaryPopover.present();
 
-        const resp: any = await this.visitService.finishVisit(this.newPayments, this.visit.id, null, this.localStorageService.token ?? '');
+        const {data: comment, role} = await commentaryPopover.onDidDismiss();
 
-        const visitResult = this.buildVisitResult(payments, this.detail.target_amount, resp)
+        console.log(comment);
+        
+        if(role == 'close' || role == 'backdrop') return;
 
-        this.loadingThing.dismiss();
-
-        await this.showSuccessToast();
-
-        this.modalCtrl.dismiss(visitResult, 'dismiss')
-      } catch(e) {
-        this.loadingThing.dismiss();
-        await this.localStorageService.clearStorage();
-        this.router.navigate(['auth']);
+        commentary = comment;
       }
-    }
+
+      const visitResult = buildVisitResult([],
+                                          this.newSimplePayments,
+                                          parseFloat(this.client.sales[this.saleIndex].visit.target_amount),
+                                          this.client.sales[this.saleIndex].visit.id);
+
+      visitResult.commentary = commentary
+
+      this.client.sales[this.saleIndex].visit.visit_result = visitResult;
+
+      // //AGREGAR PAGOS A LA COLA OFFLINE, COMENTAR ESTO PARA PROBAR FLOW OFFLINE SIN PAGAR FISICAMENTE
+      await this.offlinePay.addPayment({
+        newPayments: [],
+        newSimplePayments: this.newSimplePayments,
+        visitId: this.client.sales[this.saleIndex].visit.id,
+        comment: commentary,
+        token: this.localStorageService.token
+      })
+      // //AGREGAR PAGOS A LA COLA OFFLINE, COMENTAR ESTO PARA PROBAR FLOW OFFLINE SIN PAGAR FISICAMENTE
+      // syncQuotas(payment, this.client.sales[this.saleIndex].quotas);
+      
+      this.newSimplePayments.forEach((payment: any) => {
+        syncQuotas(payment, this.client.sales[this.saleIndex].quotas);
+      });
+      this.modalCtrl.dismiss(visitResult, 'dismiss');
   }
 
-  foundInVisitPayments(payment: any){
-    if(this.detail.visit_result == null) return false;
-    const foundPaymentInVisit = this.detail.visit_result.payments.find((visitPayment: any) => {
-      return payment.id == visitPayment.id;
-    })
+  // foundInVisitPayments(payment: any){
+  //   if(this.detail.visit_result == null) return false;
+  //   const foundPaymentInVisit = this.detail.visit_result.payments.find((visitPayment: any) => {
+  //     return payment.id == visitPayment.id;
+  //   })
 
-    if(!foundPaymentInVisit) return false;
+  //   if(!foundPaymentInVisit) return false;
 
-    return true;
-  }
+  //   return true;
+  // }
 
-  async deletePayment(quotaIndex: number, quotaPaymentIndex: number, quotaId: number, newPaymentIndex: number) {
-    const paymentDeletePopover = await this.popoverCtrl.create({
-      component: PaymentDeletePopoverComponent,
-    });
-    paymentDeletePopover.present();
+  // async deletePayment(quotaIndex: number, quotaPaymentIndex: number, quotaId: number, newPaymentIndex: number) {
+  //   const paymentDeletePopover = await this.popoverCtrl.create({
+  //     component: PaymentDeletePopoverComponent,
+  //   });
+  //   paymentDeletePopover.present();
 
-    const { data: result } = await paymentDeletePopover.onDidDismiss();
+  //   const { data: result } = await paymentDeletePopover.onDidDismiss();
 
-    if(result != true) return;
+  //   if(result != true) return;
 
-    this.detail.sale.quotas[quotaIndex].quota_payments.splice(quotaPaymentIndex, 1);
-    const quotaPayment = this.newPayments.find((quotaPayment: any) => {
-      return quotaPayment.quota_id = quotaId;
-    });
+  //   this.detail.sale.quotas[quotaIndex].quota_payments.splice(quotaPaymentIndex, 1);
+  //   const quotaPayment = this.newPayments.find((quotaPayment: any) => {
+  //     return quotaPayment.quota_id = quotaId;
+  //   });
 
-    const paymentToRemoveIndex = quotaPayment.payments.findIndex((payment: any) => {
-      return payment.index = newPaymentIndex;
-    })
-    quotaPayment.payments.splice(paymentToRemoveIndex, 1);
+  //   const paymentToRemoveIndex = quotaPayment.payments.findIndex((payment: any) => {
+  //     return payment.index = newPaymentIndex;
+  //   })
+  //   quotaPayment.payments.splice(paymentToRemoveIndex, 1);
 
-    const newPaymentToRemoveIndex = this.newPayments.findIndex((quotaPayment: any, index: number ) => {
-      return quotaPayment.quota_id == quotaId && quotaPayment.payments.length < 1
-    });
+  //   const newPaymentToRemoveIndex = this.newPayments.findIndex((quotaPayment: any, index: number ) => {
+  //     return quotaPayment.quota_id == quotaId && quotaPayment.payments.length < 1
+  //   });
 
-    if(newPaymentToRemoveIndex >= 0) this.newPayments.splice(newPaymentIndex, 1);
+  //   if(newPaymentToRemoveIndex >= 0) this.newPayments.splice(newPaymentIndex, 1);
   
 
-    return;
-  }
+  //   return;
+  // }
 
-  async modifyPayment(payment: any, quotaIdx: number, paymentIdx: number, quota: any){
-    if(payment.created_date != null) return;
+  // async modifyPayment(payment: any, quotaIdx: number, paymentIdx: number, quota: any){
+  //   if(payment.created_date != null) return;
 
-    const remaining = getTotalRemaining(quota, paymentIdx);
+  //   const remaining = getTotalRemaining(quota, paymentIdx);
 
-    const paymentPopover = await this.popoverCtrl.create({
-      component: PaymentPopoverComponent,
-      componentProps: {
-        paymentToUpdate: payment,
-        limitToPay: remaining
-      }
-    });
-    paymentPopover.present();
+  //   const paymentPopover = await this.popoverCtrl.create({
+  //     component: PaymentPopoverComponent,
+  //     componentProps: {
+  //       paymentToUpdate: payment,
+  //       limitToPay: remaining
+  //     }
+  //   });
+  //   paymentPopover.present();
 
-    const { data: updatedPayment } = await paymentPopover.onDidDismiss();
+  //   const { data: updatedPayment } = await paymentPopover.onDidDismiss();
 
-    if(updatedPayment != null) this.updateNewPayments(updatedPayment, quotaIdx);
+  //   if(updatedPayment != null) this.updateNewPayments(updatedPayment, quotaIdx);
 
-  }
+  // }
 
-  updateNewPayments(updatedPayment: any = null, quotaIdx: number) {
-    this.newPayments[quotaIdx].payments[updatedPayment.index].amount = updatedPayment.amount;
-    this.newPayments[quotaIdx].payments[updatedPayment.index].type = updatedPayment.type;
-  }
+  // updateNewPayments(updatedPayment: any = null, quotaIdx: number) {
+  //   this.newPayments[quotaIdx].payments[updatedPayment.index].amount = updatedPayment.amount;
+  //   this.newPayments[quotaIdx].payments[updatedPayment.index].type = updatedPayment.type;
+  // }
 
   isToday(quota: any): boolean{
-    if(isSameDay(quota.created_date, this.todayDate)) return true;
+    if(quota.created_date == this.todayDate) {
+      return true;
+    }
 
     return false;
   }
 
+  deleteSimplePayment(index: any){
+    this.newSimplePayments.splice(index, 1);
+  }
+
   async back() {
-    if(this.newPayments.length > 0){
+    if(this.newSimplePayments.length > 0 && this.client.sales[this.saleIndex].visit.visit_result == null){
       const discardPopover = await this.popoverCtrl.create({
         component: DiscardPopoverComponent
       });
@@ -313,13 +310,17 @@ export class VisitModalComponent  implements OnInit {
 
       const { data: result } = await discardPopover.onDidDismiss();
 
-      if(result) return this.modalCtrl.dismiss(null, 'cancel');
+      if(result) {
+        this.newSimplePayments.length = 0;
+        
+        return this.modalCtrl.dismiss(null, 'cancel')
+
+      };
 
       return;
     } else {
       return this.modalCtrl.dismiss(null, 'cancel');
     }
-      
   }
 
 }

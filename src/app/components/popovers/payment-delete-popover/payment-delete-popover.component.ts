@@ -1,5 +1,7 @@
 import { Component, OnInit } from '@angular/core';
-import { IonicModule, PopoverController } from '@ionic/angular';
+import { App } from '@capacitor/app';
+import { IonicModule, Platform, PopoverController } from '@ionic/angular';
+import { Subscription } from 'rxjs';
 
 @Component({
   selector: 'app-payment-delete-popover',
@@ -9,9 +11,28 @@ import { IonicModule, PopoverController } from '@ionic/angular';
 })
 export class PaymentDeletePopoverComponent  implements OnInit {
 
-  constructor(private popoverCtrl: PopoverController) { }
+  backButtonSubscription: Subscription
 
-  ngOnInit() {}
+  constructor(private popoverCtrl: PopoverController, private platform: Platform) { }
+  
+
+  ngOnInit() {
+    // App.addListener('backButton', () => {
+    //   this.close();
+    // })
+  }
+
+  ionViewWillEnter(): void {
+    this.backButtonSubscription = this.platform.backButton.subscribeWithPriority(130, () => {
+      this.close();
+    });
+  }
+  
+  ionViewWillLeave(): void {
+    if(this.backButtonSubscription) {
+      this.backButtonSubscription.unsubscribe()
+    }
+  }
 
   confirm() {
     this.popoverCtrl.dismiss(true, 'dismiss');

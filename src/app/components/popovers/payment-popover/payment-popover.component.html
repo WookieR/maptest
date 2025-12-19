@@ -16,7 +16,7 @@
   </ion-card>
 
   <form [formGroup]="paymentForm" (submit)="addPayment()">
-    <ion-list>
+    <ion-list style="max-height: 25vh; overflow-y: scroll;">
       <ion-item>
         <ion-input (ionInput)="onIonInput($event, 'amount')" [errorText]="errorTexts.amount" formControlName="amount" label="Monto" label-placement="floating" fill="solid" placeholder="Ingresar monto..." type="number"></ion-input>
       </ion-item>
@@ -25,8 +25,30 @@
           <ion-select-option value="Efectivo">Efectivo</ion-select-option>
           <ion-select-option value="Transferencia">Transferencia</ion-select-option>
         </ion-select>
+        <!-- <input type="file" #fileInput hidden (change)="onFileChange($event)" accept="image/*"> -->
       </ion-item>
+      @if(simple){
+        <ion-item>
+          <ion-select formControlName="config" [errorText]="errorTexts.config" [interface]="'popover'" label="Tipo de pago" fill="solid" labelPlacement="floating" value="">
+            <ion-select-option value="Acumulacion">Acumular a la ultima cuota</ion-select-option>
+            <ion-select-option value="Adelanto">Adelantar las proximas cuotas</ion-select-option>
+          </ion-select>
+          <!-- <input type="file" #fileInput hidden (change)="onFileChange($event)" accept="image/*"> -->
+        </ion-item>
+      }
+      @if(receipts.length > 0){
+        <ion-item>
+          <ion-img [src]="receipts[0].url"></ion-img>
+        </ion-item>
+      }
     </ion-list>
+    @if(receipts.length < 1 && isTransfering()){
+      <!-- <ion-item style="width: 100%;"> -->
+        <ion-button type="button" (click)="triggerFileInput()" fill="clear" expand="block">
+          Cargar comprobante
+        </ion-button>
+      <!-- </ion-item> -->
+    }
     <ion-toolbar>
       <ion-buttons slot="end">
         <ion-button color="danger" slot="end" type="button" (click)="close()">

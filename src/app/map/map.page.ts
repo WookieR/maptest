@@ -1,11 +1,11 @@
 import { Component, EventEmitter, OnInit } from '@angular/core';
 
-import { Position } from '@capacitor/geolocation';
+import { Geolocation, Position } from '@capacitor/geolocation';
 import * as mapboxgl from 'mapbox-gl';
 
 import { VisitService } from '../services/visit.service';
 import { VisitMarker } from '../interfaces/visit-marker';
-import { LoadingController, ModalController, NavController, PopoverController } from '@ionic/angular';
+import { LoadingController, ModalController, NavController, Platform, PopoverController, ViewWillEnter, ViewWillLeave } from '@ionic/angular';
 import { VisitModalComponent } from '../components/modals/visit-modal/visit-modal.component';
 import { PermissionService } from '../stores/permission.service';
 import { GeolocationService } from '../stores/geolocation.service';
@@ -14,10 +14,15 @@ import { ClientsModalComponent } from '../components/modals/clients-modal/client
 import { haversineDistanceKM } from '../helpers/distance';
 import { MapFollowService } from '../stores/map-follow.service';
 import { calcBoundsFromCoordinates } from '../helpers/bound-coordinates';
-import { determineColor } from '../helpers/marker-color';
+import { determineColor, determineMultimarkerColor } from '../helpers/marker-color';
 import { LocalstorageService } from '../stores/localstorage.service'
 import { Router } from '@angular/router';
 import { SelectSalePopoverComponent } from '../components/popovers/select-sale-popover/select-sale-popover.component';
+import { App } from '@capacitor/app';
+import { Observable, Subscription } from 'rxjs';
+import { getSelfMarker } from '../helpers/self-marker';
+import { Preferences } from '@capacitor/preferences';
+import { environment } from 'src/environments/environment';
 
 
 @Component({
@@ -26,7 +31,7 @@ import { SelectSalePopoverComponent } from '../components/popovers/select-sale-p
   styleUrls: ['map.page.scss'],
   standalone: false,
 })
-export class Tab1Page implements OnInit {
+export class Tab1Page implements OnInit, ViewWillEnter, ViewWillLeave {
 
   positionWatch: any;
   map: mapboxgl.Map | null = null;
@@ -34,8 +39,9 @@ export class Tab1Page implements OnInit {
   markers: VisitMarker[] = [];
   currentPositionMarker: mapboxgl.Marker | null = null;
   arrangeInterval: any;
-  // markers: mapboxgl.Marker[] = [
-  // ];
+  backButtonSubscription: Subscription
+  selfMarker: mapboxgl.Marker;
+  position: Position;
 
   constructor(private permissionService: PermissionService,
               private geolocationService: GeolocationService,
@@ -45,69 +51,66 @@ export class Tab1Page implements OnInit {
               // private visitService: VisitService,
               private modalCtrl: ModalController,
               private popoverCtrl: PopoverController,
-              private router: Router,
-              private navCtrl: NavController,
-              private loadingCtrl: LoadingController
-  ) {
+              private loadingCtrl: LoadingController,
+              private platform: Platform) {
   }
-
-  async ngOnInit() {
-    const loading = await this.loadingCtrl.create({
-      spinner: 'crescent',
-      backdropDismiss: false,
-      message: '...Obteniendo recorrido'
+  
+  ionViewWillEnter(): void {
+    this.backButtonSubscription = this.platform.backButton.subscribeWithPriority(110, () => {
+      App.minimizeApp();
     });
-    loading.present();
-    
-    this.initializeMap();
-
-    const platform = await this.permissionService.getPlatform();
-
-    let permissionsGranted = await this.permissionService.getGeolocationPermissionStatus(platform);
-
-    if(permissionsGranted) {
-
-      await this.getVisits();
-      
-      const objective = await this.localStorage.getObjective();
-
-      if(objective != null) {
-        const currentPosition = await this.geolocationService.getCurrentPosition();
-
-        this.rearrangevisits();
-
-        this.routeService.setObjective(objective);
-        const currentCoords = currentPosition.coords.longitude +
-                            ',' +
-                            currentPosition.coords.latitude;
-        this.routeService.recalculateRoute(currentCoords, this.map, true);
-        this.mapFollowService.setMode('route', this.map);
-
-      }
-
-      await this.geolocationService.getCurrentPosition();
-      await this.geolocationService.initGeolocationWatch(this.updateCoords, this.map);
-
-      loading.dismiss();
+  }
+  
+  ionViewWillLeave(): void {
+    if(this.backButtonSubscription) {
+      this.backButtonSubscription.unsubscribe()
     }
   }
 
+  async ngOnInit() {
+    const platform = await this.permissionService.getPlatform();
+
+    const status = await this.permissionService.getGeolocationPermissionStatus(platform);
+
+    if(status) {
+      // await this.geolocationService.getCurrentPosition();
+      // this.geolocationService.initGeolocationWatch(this.updateCoords, this.map)
+      Geolocation.watchPosition({enableHighAccuracy: true}, (position) => {
+        if(!position) return;
+
+        this.position = position;
+        
+        this.updateCoords(position);
+      })
+    }
+    
+    this.initializeMap();
+    this.getClients();
+  }
+
   updateCoords(position: Position) {
-    const selfMarker = new mapboxgl.Marker({
-      element: document.createElement('div'),
-      className: 'self-position-marker'
-    }).setLngLat([position.coords.longitude, position.coords.latitude])
+    if(this.selfMarker){
+      this.selfMarker.setLngLat([position.coords.longitude, position.coords.latitude]);
+    } else {
+      const selfMarker = new mapboxgl.Marker({
+        element: getSelfMarker(),
+        scale: 1.3
+      }).setLngLat([position.coords.longitude, position.coords.latitude]).addTo(this.map!);
+  
+      this.selfMarker = selfMarker
+    }
+
+    // this.rearrangeClients(position);
   }
 
   async initializeMap() {
     (mapboxgl as any).accessToken = 'pk.eyJ1Ijoid29va2llciIsImEiOiJjbWZpeGp0cjUwY2lwMmtwdnFwYnN6eTIxIn0.eMs3r09QHZyIgZ5f6UfIjQ'; // Cast to any to avoid TypeScript errors
     this.map = new mapboxgl.Map({
       container: 'map', // container ID
-      // style: 'mapbox://styles/mapbox/streets-v11', // style URL
-      // style: 'mapbox://styles/mapbox/streets-v12',
-      style: 'mapbox://styles/wookier/cmh0o168j000h01qk0j3713e8',
+      // style: { version: 8, sources: {}, layers: [] },
       center: [-65.2064410002705, -26.829806637711094], // starting position [lng, lat]
-      zoom: 15 // starting zoom,
+      zoom: 15, // starting zoom,
+      pitch: 20
     });
 
     this.map.addControl(new mapboxgl.NavigationControl({
@@ -119,191 +122,121 @@ export class Tab1Page implements OnInit {
       window.dispatchEvent(new Event("resize"));
     });
 
-    this.map.on("dragstart", () => {
-      this.mapFollowService.addFreeMoveTime();
-    });
-
-    this.map.on("dragend", () => {
-      this.mapFollowService.addFreeMoveTime();
-    });
+    // this.map.dragRotate.disable();
+    // this.map.touchZoomRotate.disable();
+    // this.map.rotate
+    this.map.touchZoomRotate.disableRotation();
   }
 
-  async getVisits() {
-    const visits = await this.localStorage.getVisits();
-    this.visits.length = 0;
-    this.visits.push(...visits);
+  async getClients() {
+    let clients = await this.localStorage.getClients();
+    this.visits.push(...clients);
 
     this.createMarkers();
-    this.rearrangevisits();
-    this.startRearrangeInterval();
   }
+  
+  createMarkers() {
+    this.visits.forEach((client, index) => {
+      const marker = new mapboxgl.Marker({
+        scale: 1.2,
+        color: client.sales.length > 1 ? determineMultimarkerColor(client.sales) : 
+                                        client.sales[0].visit.visit_result != null || client.sales[0].visit.visit_result != undefined ? client.sales[0].visit.visit_result.color : '#0269c2'
+        // color: client.sales[0].visit.visit_result != null || client.sales[0].visit.visit_result != undefined ? client.sales[0].visit.visit_result.color : '#0269c2'
+      }).setLngLat(client.location_longlat.split(','))
 
-  startRearrangeInterval(){
-    this.arrangeInterval = setInterval(() => {
-      this.rearrangevisits();
-    }, 10000)
-  };
-
-  async rearrangevisits() {
-    const currentPosition = await this.geolocationService.currentCoords;
-
-    this.visits.map((visit) => {
-      const distance = haversineDistanceKM(currentPosition?.coords.longitude + 
-                                            ',' +
-                                            currentPosition?.coords.latitude,
-                                            visit.sale.client.location_longlat);
-
-      visit.distance = distance;
-
-      return visit;
-    });
-
-    const visited = this.visits.filter((visit: any) => {
-      return visit.visit_result != null;
-    });
-
-    const nonVisited = this.visits.filter((visit: any) => {
-      return visit.visit_result == null && (visit.pending == null || visit.pending == false);
-    })
-
-    const pending = this.visits.filter((visit: any) => {
-      return visit.visit_result == null && (visit.pending != null && visit.pending == true);
-    });
-
-    this.sortByDistanceAsc(nonVisited);
-
-    this.visits.length = 0;
-    this.visits.push(...nonVisited, ...pending, ...visited);
-    await this.localStorage.setVisits(this.visits);
-  }
-
-  sortByDistanceAsc(array: any) {
-    array.sort(function(a: any, b: any) {
-      return parseFloat(a.distance) - parseFloat(b.distance);
-    })
-  }
-
-  async markerClicked(visit: any, marker: mapboxgl.Marker){
-
-    const foundVisits = this.visits.filter((availableVisit: any) => {
-      return availableVisit.client_id == visit.client_id
-    });
-
-    let selectedVisit = visit;
-
-    console.log(visit);
-
-    if(foundVisits.length > 1){
-      const visitSelectPopover = await this.popoverCtrl.create({
-        component: SelectSalePopoverComponent,
-        componentProps: {
-          visits: foundVisits
-        },
-        backdropDismiss: false
+      marker.getElement().addEventListener('click', () => {
+        this.markerClicked(client, index);
       })
-      visitSelectPopover.present();
 
-      const {data: resultVisit} = await visitSelectPopover.onDidDismiss();
-
-      if (resultVisit == null) return;
-
-      selectedVisit = resultVisit
-    }
-
-    const modal = await this.modalCtrl.create({
-      component: VisitModalComponent,
-      cssClass: 'my-custom-modal',
-      componentProps: {
-        visit: selectedVisit
-      },
-      backdropDismiss: false
+      marker.addTo(this.map!);
+      client.marker = marker;
     })
-
-    modal.present()
-
-    const { data: visitResult } = await modal.onDidDismiss();
-
-    if(visitResult == null) return;
-
-    visit.visit_result = visitResult;
-    const visitLongLat = visit.sale.client.location_longlat.split(',');
-
-    await this.localStorage.setVisits(this.visits);
-    await this.localStorage.clearObjective();
-
-    marker.remove();
-    marker = new mapboxgl.Marker({ color: visitResult.color, scale: 1.2 })
-                                .setLngLat([visitLongLat[0], visitLongLat[1]]);
-
-    marker.getElement().addEventListener("click", (event) => {
-      this.markerClicked(visit, marker);
-    });
-                          
-    if(this.map) marker.addTo(this.map);
-    window.dispatchEvent(new Event("resize"));
-
-    this.centerInSelf();
-    this.routeService.objectiveCoords = '';
-
-    if (this.map?.getLayer('route') != undefined){
-      this.map?.removeLayer('route');
-      this.map?.removeSource('route');
-    }
-    this.rearrangevisits();
-    this.openClientsSheetModal();
   }
 
-  createMarkers(): void {
-      const markers: VisitMarker[] = this.visits.map((visit: any) => {
-        const location_long = visit.sale.client.location_longlat.split(',')[0];
-        const location_lat = visit.sale.client.location_longlat.split(',')[1]
-
-        const payments = visit.visit_result == null ? null : visit.visit_result.payments;
-        const targetAmount = visit.target_amount
-
-        return {
-          visit: visit,
-          marker: new mapboxgl.Marker(
-                          { color: determineColor(payments, targetAmount), scale: 1.2 }
-                        ).setLngLat([location_long, location_lat])
+  async markerClicked(client: any, visitIndex: any) {
+    if(client.sales.length > 1){
+      const selectSaleDialog = await this.popoverCtrl.create({
+        component: SelectSalePopoverComponent,
+        backdropDismiss: true,
+        componentProps: {
+          client: client
         }
       });
+      selectSaleDialog.present();
 
-      this.markers.push(...markers);
+      const { data: index } = await selectSaleDialog.onDidDismiss();
 
-      this.markers.forEach((visitMarker: VisitMarker) => {
-        visitMarker.marker.getElement().addEventListener("click", (event) => {
-          this.markerClicked(visitMarker.visit, visitMarker.marker);
-        });
+      if(index == null) return;
+
+      const visitDialog = await this.modalCtrl.create({
+        component: VisitModalComponent,
+        componentProps: {
+          client: {
+            ...client,
+          },
+          saleIndex: index
+        }
       })
 
-      this.addMarkersToMap();
+      visitDialog.present();
+
+
+      const { data: result } = await visitDialog.onDidDismiss();
+
+      if(result == null) return;
+
+      this.updateMarker(visitIndex, result);
+
+      await this.localStorage.updateClientsInMemory(this.visits);
+
+    } else {
+
+      const visitDialog = await this.modalCtrl.create({
+        component: VisitModalComponent,
+        componentProps: {
+          client: {
+            ...client
+          },
+          saleIndex: 0
+        }
+      });
+      visitDialog.present();
+
+      const { data: result } = await visitDialog.onDidDismiss();
+
+      if(result == null) return;
+
+      this.updateMarker(visitIndex, result);
+
+      await this.localStorage.updateClientsInMemory(this.visits);
+    }
   }
 
-  setObjectiveClient(client: any){
-    this.routeService.setObjective(client.location_longlat);
-    const currentCoords = this.geolocationService.currentCoords?.coords.longitude +
-                          ',' +
-                          this.geolocationService.currentCoords?.coords.latitude;
-    this.routeService.recalculateRoute(currentCoords, this.map, true);
-  }
+  updateMarker(visitIndex: any, visitResult: any) {
 
-  addMarkersToMap(): void {
-    this.markers.forEach((visitMarker: VisitMarker) => {
-      if(this.map) {
-        visitMarker.marker.addTo(this.map);
-      }
-    })
+    const client: any = this.visits[visitIndex];
+    this.visits[visitIndex].marker.remove();
+  
+    const newMarker = new mapboxgl.Marker({
+      color: client.sales.length < 2 ? visitResult.color : determineMultimarkerColor(client.sales),
+      scale: 1.2
+    }).setLngLat(this.visits[visitIndex].location_longlat.split(','));
+    newMarker.addTo(this.map!);
+    newMarker.getElement().addEventListener('click', () => {
+      this.markerClicked(this.visits[visitIndex], visitIndex);
+    });
+
+    this.visits[visitIndex].marker = newMarker;
+
   }
 
   async openClientsSheetModal() {
 
     const clientsModal: any = await this.modalCtrl.create({
       component: ClientsModalComponent,
-      breakpoints: [0, 0.25, 0.5, 0.75],
-      initialBreakpoint: 0.25,
       componentProps: {
         visits: this.visits,
+        position: this.position
       },
       
       cssClass: 'opacity'
@@ -313,55 +246,19 @@ export class Tab1Page implements OnInit {
 
     const { data, role } = await clientsModal.onDidDismiss();
 
-    if(role == 'markedAsPending'){
-      this.rearrangevisits();
-      this.openClientsSheetModal();
-      return;
-    }
-
-    if(data == null) return;
-
-    const { client, visited } = data
-
-    if(client == null) return;
-
-    if(!visited) {
-      if(client) this.setObjectiveClient(client);
-      this.mapFollowService.setMode('route', this.map);
-    } else {
-      this.mapFollowService.setMode('free', this.map);
-      this.routeService.objectiveCoords = '';
-
-      if (this.map?.getLayer('route') != undefined){
-        this.map?.removeLayer('route');
-        this.map?.removeSource('route');
-      }
-
+    if(role == 'flyto'){
       this.map?.flyTo({
-          center: [ client.location_longlat.split(',')[0], client.location_longlat.split(',')[1] ],
-          speed: 0.8,
-          curve: 1
-      })
+        center: data.location_longlat.split(','),
+        speed: 2,
+        curve: 0.8,
+        zoom: 18
+      });
     }
-
-  }
-
-  changeMapFollowingMode(mode: 'route' | 'free') {
-    this.mapFollowService.setMode(mode, this.map);
-  }
-
-  centerInSelf() {
-    this.mapFollowService.centerInSelf(this.map);
   }
 
   async logout() {
+    await Preferences.remove({key: 'clients'});
+    await Preferences.remove({key: 'token'});
     window.location.reload();
-    await this.localStorage.clearStorage();
-    // await this.geolocationService.stopGeolocationWatch();
-    // this.map?.remove();
-    // this.map = null;
-    // clearInterval(this.arrangeInterval);
-    // // this.router.navigateByUrl('/auth');
-    // this.navCtrl.navigateRoot('/auth');
   }
 }

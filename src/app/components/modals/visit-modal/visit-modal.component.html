@@ -6,10 +6,10 @@
         <ion-icon name="arrow-back-outline"></ion-icon>
       </ion-button>
     </ion-buttons>
-    <ion-title>Detalles de Cliente</ion-title>
-    @if(visit.visit_result == null) {
+    <ion-title>{{ client.sales[saleIndex].number }}</ion-title>
+    @if(client.sales[saleIndex].visit.visit_result == null) {
       <ion-buttons slot="end">
-        <ion-button (click)="finishVisit()" color="primary">
+        <ion-button color="primary" (click)="finishVisit()">
           <ion-icon name="checkmark-circle-outline"></ion-icon>
         </ion-button>
       </ion-buttons>
@@ -18,41 +18,56 @@
 </ion-header>
 <ion-card color="light">
   <ion-card-content class="ion-text-center">
-    <h2>{{ visit.sale.client.fullname }}</h2>
+    <h2>{{ client.fullname }}</h2>
+    <a [href]="'https://wa.me/' + client.phone" target="_blank">{{ client.phone }}</a>
     <ion-text color="medium">
       <div style="display: flex;" class="ion-justify-content-center">
         <ion-icon name="location-outline" color="medium">
         </ion-icon>
-        <p>{{ visit.sale.client.business_address }}</p>
+        <p>{{ client.business_address }}</p>
       </div>
     </ion-text>
   </ion-card-content>
+  <ion-card-subtitle>
+    <ion-grid>
+      <ion-row>
+        <ion-col>
+          Saldo: {{ getSaleRemaining() }}
+        </ion-col>
+        <ion-col>
+          Atraso: Un chillion de dolares
+        </ion-col>
+      </ion-row>
+    </ion-grid>
+    <ion-label>
+    </ion-label>
+  </ion-card-subtitle>
 </ion-card>
-@if(!isLoading && detail.visit_result != null) {
+@if(!isLoading && client.sales[saleIndex].visit.visit_result != null) {
   <ion-card color="light">
     <ion-card-content class="ion-text-center">
       <h2>Visita Completada - 
-        <span [class.complete-pay-text]="status == 'Pago Completo'"
-              [class.partial-pay-text]="status == 'Pago Parcial'"
-              [class.impaid-text]="status=='Impaga'">
-          {{status}}
+        <span [class.complete-pay-text]="client.sales[saleIndex].visit.visit_result.status == 'Pago Completo'"
+              [class.partial-pay-text]="client.sales[saleIndex].visit.visit_result.status == 'Pago Parcial'"
+              [class.impaid-text]="client.sales[saleIndex].visit.visit_result.status=='Impaga'">
+          {{client.sales[saleIndex].visit.visit_result.status}}
         </span>
       </h2>
       <ion-text color="medium">
         <div style="display: flex;" class="ion-justify-content-center">
-          <p>{{ visit.completed_at_date }}</p>
+          <p>{{ client.sales[saleIndex].visit.completed_at_date }}</p>
         </div>
       </ion-text>
     </ion-card-content>
   </ion-card>
 
-  @if(!isLoading && detail.visit_result.commentary != null) {
+  @if(!isLoading && client.sales[saleIndex].visit.visit_result.commentary != null) {
     <ion-card color="light">
       <ion-card-content class="ion-text-center">
         <h2>Comentario</h2>
         <ion-text color="medium">
           <div style="display: flex;" class="ion-justify-content-center">
-            <p>{{ detail.visit_result.commentary }}</p>
+            <p>{{ client.sales[saleIndex].visit.visit_result.commentary }}</p>
           </div>
         </ion-text>
       </ion-card-content>
@@ -60,20 +75,41 @@
   }
 }
 <ion-content>
+  <ion-list>
+    @for(simplePayment of newSimplePayments; track simplePayment){
+      <ion-item-sliding>
+        @if(this.client.sales[saleIndex].visit.visit_result == null){
+          <ion-item-options side="start">
+            <ion-item-option color="danger" (click)="deleteSimplePayment($index)">
+              <ion-icon name="trash"></ion-icon>
+            </ion-item-option>
+          </ion-item-options>
+        }
+        <ion-item>
+          <ion-label>{{simplePayment.type}}: <span style="font-weight: 600;">${{simplePayment.amount}} - {{simplePayment.config}}</span></ion-label>
+        </ion-item>
+      </ion-item-sliding>
+    }
+    @if(!isLoading && client.sales[saleIndex].visit.visit_result == null){
+      <ion-item>
+        <ion-button size="small" expand="block" fill="clear" (click)="openSimplePaymentPopover()">
+          Registrar Pago
+          <ion-icon slot="end" name="add-outline"></ion-icon>
+        </ion-button>
+      </ion-item>
+    }
+  </ion-list>
   @if(!isLoading){
     <ion-segment value="quotas">
         <ion-segment-button value="quotas" content-id="quotas">
           <ion-label>Cuotas</ion-label>
-        </ion-segment-button>
-        <ion-segment-button value="visits" content-id="visits">
-          <ion-label>Visitas</ion-label>
         </ion-segment-button>
     </ion-segment>
       <ion-segment-view style="height: auto;">
 
         <ion-segment-content id="quotas">
             <ion-accordion-group>
-              @for(quota of detail.sale.quotas; track quota.id; let quotaIdx = $index){
+              @for(quota of client.sales[saleIndex].quotas; track quota.id; let quotaIdx = $index){
                 <ion-accordion [value]="'quota' + quota.id">
                   <ion-item slot="header" color="light">
                     <ion-label>Cuota {{ quota.created_date }}
@@ -98,13 +134,13 @@
                         <ion-item-sliding>
                           @if(!quotaPayment.created_date){ 
                             <ion-item-options side="start">
-                              <ion-item-option color="danger" (click)="deletePayment(quotaIdx, paymentIdx, quota.id, quotaPayment.index)">
+                              <ion-item-option color="danger">
                                 <ion-icon name="trash"></ion-icon>
                               </ion-item-option>
                             </ion-item-options>
                           }
 
-                          <ion-item [class.paid-in-visit-item]="foundInVisitPayments(quotaPayment)" (click)="modifyPayment(quotaPayment, quotaIdx, paymentIdx, quota)">
+                          <ion-item>
                             @if(quotaPayment.created_date){
                               <ion-label>Registrado el: <span style="font-weight: 600;">{{quotaPayment.created_date}}</span></ion-label>
                             }
@@ -121,12 +157,12 @@
                       }
                     </ion-list>
 
-                    @if(detail.visit_result == null && !quota.payment_completed){
-                      <ion-button size="small" expand="block" fill="clear" (click)="openPaymentPopover($event, quota.id, quota)">
+                    <!-- @if(client.sales[saleIndex].visit.visit_result == null && !quota.payment_completed){
+                      <ion-button size="small" expand="block" fill="clear">
                         Registrar Pago
                         <ion-icon slot="end" name="add-outline"></ion-icon>
                       </ion-button>
-                    }
+                    } -->
 
                   </div>
                 </ion-accordion>
@@ -134,9 +170,9 @@
             </ion-accordion-group>
         </ion-segment-content>
   
-        <ion-segment-content id="visits">
+        <!-- <ion-segment-content id="visits">
           <ion-accordion-group>
-            @for(visit of detail.sale.visits; track visit){
+            @for(visit of client.sales[saleIndex].visits; track visit){
               <ion-accordion [value]="'visit' + visit.id">
                 <ion-item slot="header" color="light">
                   <ion-label>Visita {{ visit.id }}</ion-label>
@@ -147,7 +183,7 @@
               </ion-accordion>
             }
           </ion-accordion-group>
-        </ion-segment-content>
+        </ion-segment-content> -->
 
       </ion-segment-view>
   } @else {

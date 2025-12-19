@@ -9,14 +9,32 @@
   <ion-content>
     <ion-item>
       
-      <ion-text ion-padding>
-        Se han registrado los siguientes pagos. Proceder?
-      </ion-text>
+      @if(payments.length > 0){
+        <ion-text ion-padding>
+          Se han registrado los siguientes pagos. Proceder?
+        </ion-text>
+      }
+
+      @if(payments.length == 0){
+        <ion-text ion-padding>
+          No se han registrado pagos durante esta visita. Proceder?
+        </ion-text>
+      }
 
     </ion-item>
 
-    <ion-accordion-group>
-      @for(quota of quotas; track quota) {
+    @if(payments.length > 0){
+      <ion-list>
+        @for(payment of payments; track payment){
+          <ion-item>
+            <ion-label>{{payment.type}}: <span style="font-weight: 600;">{{payment.amount}}</span></ion-label>
+          </ion-item>
+        }
+      </ion-list>
+    }
+
+    <!-- <ion--group>
+      @for(payment of payments; track payment) {
         <ion-accordion [value]="'quota' + quota.id">
           <ion-item slot="header" color="light">
             <ion-label>Cuota {{ quota.id }} - ${{ quota.amount }}</ion-label>
@@ -35,13 +53,13 @@
           </div>
         </ion-accordion>
       }
-    </ion-accordion-group>
+    </ion-accordion-group> -->
     
     
     <ion-toolbar>
       <ion-buttons slot="end">
         <ion-button color="danger" slot="end" (click)="close()">
-          Salir
+          Cancelar
         </ion-button>
         <ion-button color="primary" slot="end" type="submit" (click)="confirm()">
           Confirmar

@@ -4,6 +4,7 @@ import { AuthService } from '../services/auth.service';
 import { LocalstorageService } from '../stores/localstorage.service';
 import { Router } from '@angular/router';
 import { LoadingController } from '@ionic/angular';
+import { App } from '@capacitor/app';
 
 @Component({
   standalone: false,
@@ -25,7 +26,7 @@ export class AuthPage implements OnInit {
   }
 
   async ngOnInit() {
-    await this.localStorageService.clearStorage(); 
+    // await this.localStorageService.clearStorage(); 
   }
 
   async submit() {
@@ -49,6 +50,10 @@ export class AuthPage implements OnInit {
       console.log('falla el login culiau')
     }
 
+  }
+
+  async exit(){
+    App.minimizeApp()
   }
 
 }

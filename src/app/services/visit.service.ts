@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
-import { first, firstValueFrom, take } from 'rxjs';
+import { first, firstValueFrom, switchMap, take, timeout } from 'rxjs';
 import { environment } from 'src/environments/environment';
 import { LocalstorageService } from '../stores/localstorage.service';
 
@@ -31,20 +31,17 @@ export class VisitService {
     }).pipe(take(1));
 
     return await firstValueFrom(observable);
-
-    // return this.http.get(this.baseUrl + this.visitEndpoint + param, {
-    //   headers: {'ngrok-skip-browser-warning':'123456', 'x-token': token}
-    // }).pipe(take(1));
   }
 
-  async finishVisit(newPayments: any[], visitId: number, comment = null, token: string){
+  async finishVisit(newPayments: any[], newSimplePayments: any[], visitId: number, comment = null, token: string){
     const observable = this.http.post(this.baseUrl + this.visitEndpoint, {
       visit_id: visitId,
       quota_payments: newPayments,
+      payments: newSimplePayments,
       commentary: comment
     }, {
       headers: {'ngrok-skip-browser-warning':'123456', 'x-token': token}
-    }).pipe(take(1));
+    }).pipe(take(1), timeout(20000));
 
     return await firstValueFrom(observable);
   }

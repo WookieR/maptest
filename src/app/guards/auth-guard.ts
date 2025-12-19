@@ -3,6 +3,7 @@ import { CanActivateFn, Router } from '@angular/router';
 import { AuthService } from '../services/auth.service';
 import { LocalstorageService } from '../stores/localstorage.service';
 import { GeolocationService } from '../stores/geolocation.service';
+import { Preferences } from '@capacitor/preferences';
 
 export const AuthGuard: CanActivateFn = async (route, state) => {
   const authService = inject(AuthService);
@@ -13,8 +14,6 @@ export const AuthGuard: CanActivateFn = async (route, state) => {
   try{
     const token = await localStorageService.getToken()
 
-    console.log(token)
-
     const resp: any = await authService.renew(token ?? '');
 
     await localStorageService.setToken(resp.result.token);
@@ -22,10 +21,12 @@ export const AuthGuard: CanActivateFn = async (route, state) => {
     return true;
 
   } catch (e) {
-    await localStorageService.clearStorage();
+
+    // await localStorageService.clearStorage();
 
     router.navigate(['auth']);
-
+    await Preferences.remove({key: 'clients'});
     return false;
+
   }
 };

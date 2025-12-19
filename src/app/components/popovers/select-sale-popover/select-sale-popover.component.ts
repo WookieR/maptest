@@ -1,5 +1,5 @@
 import { Component, Input, OnInit } from '@angular/core';
-import { IonicModule, PopoverController } from '@ionic/angular';
+import { IonicModule, Platform, PopoverController, ViewWillEnter, ViewWillLeave } from '@ionic/angular';
 
 @Component({
   selector: 'app-select-sale-popover',
@@ -7,17 +7,30 @@ import { IonicModule, PopoverController } from '@ionic/angular';
   styleUrls: ['./select-sale-popover.component.scss'],
   imports: [IonicModule]
 })
-export class SelectSalePopoverComponent  implements OnInit {
+export class SelectSalePopoverComponent  implements OnInit, ViewWillEnter, ViewWillLeave {
 
-  @Input() visits: any[] = []
+  @Input() client: any;
+  backButtonSubscription: any;
 
-  constructor(private popoverCtrl: PopoverController) { }
+  constructor(private popoverCtrl: PopoverController, private platform: Platform) { }
 
   ngOnInit() {
   }
 
-  select(visit: any) {
-    this.popoverCtrl.dismiss(visit, 'select');
+  ionViewWillEnter(): void {
+    this.backButtonSubscription = this.platform.backButton.subscribeWithPriority(120, () => {
+      this.close();
+    });
+  }
+  
+  ionViewWillLeave(): void {
+    if(this.backButtonSubscription) {
+      this.backButtonSubscription.unsubscribe()
+    }
+  }
+
+  select(index: any) {
+    this.popoverCtrl.dismiss(index, 'select');
   }
 
   close() {

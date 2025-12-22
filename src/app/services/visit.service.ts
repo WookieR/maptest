@@ -33,15 +33,16 @@ export class VisitService {
     return await firstValueFrom(observable);
   }
 
-  async finishVisit(newPayments: any[], newSimplePayments: any[], visitId: number, comment = null, token: string){
+  async finishVisit(newPayments: any[], newSimplePayments: any[], visitId: number, comment = null, token: string, offline: boolean = false){
     const observable = this.http.post(this.baseUrl + this.visitEndpoint, {
       visit_id: visitId,
       quota_payments: newPayments,
       payments: newSimplePayments,
-      commentary: comment
+      commentary: comment,
+      offline: offline
     }, {
       headers: {'ngrok-skip-browser-warning':'123456', 'x-token': token}
-    }).pipe(take(1), timeout(20000));
+    }).pipe(take(1), timeout(10000));
 
     return await firstValueFrom(observable);
   }

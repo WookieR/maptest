@@ -25,8 +25,10 @@ export class LocalstorageService {
     if(this.clients.length < 1){
       const clientsFromMemory = await Preferences.get({key: 'clients'});
 
+      const token = await this.getToken();
+
       if(clientsFromMemory.value == null){
-        const resp: any = await this.visitService.getVisits(this.token!);
+        const resp: any = await this.visitService.getVisits(token!);
         this.clients.push(...resp.result);
         await this.saveClients();
       } else {

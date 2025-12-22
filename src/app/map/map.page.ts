@@ -108,6 +108,7 @@ export class Tab1Page implements OnInit, ViewWillEnter, ViewWillLeave {
     this.map = new mapboxgl.Map({
       container: 'map', // container ID
       // style: { version: 8, sources: {}, layers: [] },
+      style: 'mapbox://styles/wookier/cmj1sqbut007d01s2dw1scl3n',
       center: [-65.2064410002705, -26.829806637711094], // starting position [lng, lat]
       zoom: 15, // starting zoom,
       pitch: 20
@@ -121,6 +122,8 @@ export class Tab1Page implements OnInit, ViewWillEnter, ViewWillLeave {
     this.map.on("load", () => {
       window.dispatchEvent(new Event("resize"));
     });
+
+    this.map.setConfigProperty('basemap', 'show3dObjects', false);
 
     // this.map.dragRotate.disable();
     // this.map.touchZoomRotate.disable();

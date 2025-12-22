@@ -27,7 +27,7 @@ export class OfflinePayService {
   }
 
   syncPayments() {
-    return interval(500 * 30).pipe(
+    return interval(15000).pipe(
       switchMap(async() => {
         return this.payments.find(() => true);
       }),

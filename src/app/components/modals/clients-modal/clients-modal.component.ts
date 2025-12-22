@@ -54,7 +54,6 @@ export class ClientsModalComponent implements OnInit, ViewWillEnter, ViewWillLea
     });
 
     this.sortByDistanceAsc(this.clients);
-    console.log(this.clients);
   }
 
   sortByDistanceAsc(array: any) {

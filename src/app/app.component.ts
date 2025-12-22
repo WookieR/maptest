@@ -42,7 +42,8 @@ export class AppComponent implements OnInit {
                                                                         resp.newSimplePayments,
                                                                         resp.visitId,
                                                                         resp.comment,
-                                                                        resp.token);
+                                                                        resp.token,
+                                                                        true);
 
         if(finishVisitResp.success){
           console.log('pago aceptado... borrando de memoria');

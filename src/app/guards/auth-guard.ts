@@ -14,9 +14,15 @@ export const AuthGuard: CanActivateFn = async (route, state) => {
   try{
     const token = await localStorageService.getToken()
 
-    const resp: any = await authService.renew(token ?? '');
+    if(token == null || token == ''){
+      router.navigate(['auth']);
+      await Preferences.remove({key: 'clients'});
+      return false;
+    }
 
-    await localStorageService.setToken(resp.result.token);
+    // const resp: any = await authService.renew(token ?? '');
+
+    // await localStorageService.setToken(resp.result.token);
 
     return true;
 

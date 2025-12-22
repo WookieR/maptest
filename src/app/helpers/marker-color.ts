@@ -26,30 +26,26 @@ export function determineColor(payments: any, target_amount: any) {
 }
 
 export function determineMultimarkerColor(sales: any){
-  let color = blue;
-  let first = true;
-
+  let color = '';
   sales.forEach((sale: any) => {
-    if((sale.visit.visit_result == null || sale.visit.visit_result == undefined) && color != blue){
-      color = yellow
+    const saleColor = sale.visit.visit_result != null ? sale.visit.visit_result.color : blue;
+
+    if (color == ''){
+      color = saleColor;
+      return;
     }
 
-    if(sale.visit.visit_result != null && color == blue){
-      color = yellow
-    };
-
-    if(color == yellow && first){
-      color = sale.visit.visit_result.color;
+    if(color != saleColor){
+      color = yellow;
+      return;
     }
 
-    if(color != blue && !first){
-      color = yellow
+    if(color == saleColor){
+      color = saleColor;
+      return;
     }
-
-    first = false;
-  })
+  });
 
   return color;
-
 
 }
